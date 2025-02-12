@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Player</title>
+    <link rel="stylesheet" href="/video.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+        integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+
+<body>
+    <button id="themeToggle"><i class="fa-solid fa-moon"></i>/<i class="fa-solid fa-sun"></i></button>
+
+    <div class="container">
+        <div class="video-chat-wrapper">
+            <div class="video-section">
+                <h1>Watch Together: welcome~ <span id="user1Display"><%= name %></span></h1>
+
+                <% if (videoId) { %>
+                    <div class="video-wrapper">
+                        <iframe width="1000" height="600"
+                            src="https://www.youtube.com/embed/<%= videoId %>?rel=0&modestbranding=1" frameborder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen>
+                        </iframe>
+                    </div>
+                <% } %>
+            </div>
+
+            <div class="chat-section">
+                <h2>Live Chat</h2>
+                <div class="chat-box" id="chatBox">
+                    <% messages.forEach(function(message) { %>
+                        <% if (message.sender === name || "unidentified") { %>
+                            <div class="message-sent">
+                                <div class="message-info">You - <%= message.time %></div>
+                                <%= message.text %>
+                            </div>
+                        <% } else { %>
+                            <div class="message-received">
+                                <div class="message-info"><%= message.sender %> - <%= message.time %></div>
+                                <%= message.text %>
+                            </div>
+                        <% } %>
+                    <% }); %>
+                </div>
+                <div class="chat-input">
+                    <input type="text" id="messageInput" placeholder="Type your message...">
+                    <button id="sendMessage" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const name = "<%= name %>"; 
+    </script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/video.js"></script>
+</body>
+
+</html>

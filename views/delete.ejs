@@ -1,0 +1,8 @@
+<% layout('./templates/bolierplate.ejs') -%>
+
+    <form action="/delete_/<%=data.id%>?_method=DELETE", method="post">
+        <div class="alert alert-primary" role="alert">
+            Do you really want to delete the the listing 
+            <button class="btn button">Delete</button>
+          </div>
+    </form>

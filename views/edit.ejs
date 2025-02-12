@@ -1,0 +1,33 @@
+<% layout('./templates/bolierplate.ejs') -%>
+    <form action="/edit/<%=data.id%>?_method=PUT", method="POST">
+        <div class="mb-3">
+            <lable for="title" class="form-label">Title</lable>
+            <input type="text" placeholder="enter title", name="title" class="form-control" value="<%=data.title%>">
+        </div>
+        <div class="mb-3">        <lable for="description" class="form-label">description</lable>
+            <textarea type="text", placeholder="description", name="description" class="form-control" ><%=data.description%></textarea></div>
+        
+            <div class="mb-3">        <lable for="image url" class="form-label">Image url</lable>
+                <input type="text" placeholder="image url", name="img" class="form-control" value="<%=data.image.url%>"></div>
+
+            
+                <div class="row">
+                    <div class="mb-3 col-md-4">
+                    <lable for="price" class="form-label">price</lable>
+                    <input type="number" placeholder="price" name="price" class="form-control" value="<%=data.price%>">
+                    </div>
+            
+                    <div class="mb-3 col-md-8">
+                    <lable for="country" class="form-label">country</lable>
+                    <input type="text", placeholder="country", name="country" class="form-control" value="<%=data.country%>">
+                    </div>
+                    </div>
+    
+    
+            <div class="mb-3">     <lable for="location" class="form-label">location</lable>
+                <input type="text" placeholder="loaction", name="location" class="form-control" value="<%=data.location%>"></div>
+
+
+    
+            <button class="btn btn-dark">Submit</button>
+    </form>

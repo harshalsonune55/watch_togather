@@ -1,21 +1,45 @@
 require("dotenv").config();
-
+const flash=require("connect-flash");
 const express=require("express");
 let app=express();
-const port=process.env.PORT || 8080;
-// const mongoose=require("mongoose");
+const port=process.env.PORT;
+const mongoose=require("mongoose");
 const path=require("path");
-// const List=require("./database/dataadding.js");
 var methodOverride = require('method-override');
 const engine = require('ejs-mate');
 const http = require("http");
-const socketIo = require("socket.io");
+const { Server } = require('socket.io');
+const Userp=require("./database/users.js");
+const session=require("express-session");
+const {isloggedin}=require("./middlewere/login_auth.js");
+const passport=require("passport");
+const localStrategy=require("passport-local");
 
+
+const sessionOption={
+    secret:"My super Sceret code",
+    resave:false,
+    saveUninitialized:true,
+    cookie:{
+        expires:Date.now() + 7*24*60*60*1000,
+        maxAge:7*24*60*60*1000,
+        httpOnly:true
+  
+    }
+  
+  }
 
 //storing message
 let user1="";
 const message=[];
 
+
+app.use(session(sessionOption));
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new localStrategy(Userp.authenticate()));
+passport.serializeUser(Userp.serializeUser());
+passport.deserializeUser(Userp.deserializeUser());
 app.engine('ejs', engine);
 app.use(express.static(path.join(__dirname,"public")));
 app.set("view engine","ejs");
@@ -23,116 +47,75 @@ app.set("views",path.join(__dirname,"/views"));
 app.use(express.urlencoded({extended:true}));
 app.use(methodOverride('_method'));
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = new Server(server);
+app.use(flash());
+app.use((req, res, next) => {
+    res.locals.success = req.flash("success");
+    res.locals.error = req.flash("error");
+    next();
+  });
 
 
 
-// main()
-// .then((res)=>{
-//     console.log("successfully connected to database");
-// })
-// .catch(err => console.log(err));
 
-// async function main() {
-//   await mongoose.connect(process.env.MONGO_URL);
-// }
+  app.post("/signup",async(req,res)=>{
+    let{Username,Email,Password,Confirm_Password}=req.body;
+    try{
+      if(Password==Confirm_Password){
+        let newUser=new Userp({
+            email:Email,
+            username:Username,
+      })
+      req.session.name=Username;
+      let regestiredUser= await Userp.register(newUser,Password);
+      req.flash("success","sign-up successfully");
+      req.login(regestiredUser, function(err) {
+        if (err) { return next(err); }
+        req.flash("success","welcome to watch togather");
+        return res.redirect('/video');
+      });
+      
+      }else{
+        req.flash("error", "Re-entered password did not match!");
+        return res.redirect("/signup");
+      }
+    }catch(e){
+      console.log(e)
+      req.flash("error","user already exist!");
+      return res.redirect("/signup")
+    }
+    
+    
+    });
 
- 
-// app.get("/home",async(req,res)=>{
-//     let lists= await List.find({});
-//     res.render("homepage.ejs",{lists});
 
-// });
+const DBURL=process.env.DBURL;    
 
+main()
+.then((res)=>{
+    console.log("successfully connected to database");
+})
+.catch(err => console.log(err));
 
-// app.post("/add",async(req,res)=>{
-//     let data=req.body;
-//     let data1= new List({
-//         title:data.title,
-//         description:data.description,
-//         image:{
-//             filename:"listingimage",
-//             url:data.img
-//         },
-//         country:data.country,
-//         location:data.location,
-//         price:data.price
+async function main() {
+  await mongoose.connect(DBURL);
+}
 
-//     });
-//     await data1.save().then((res)=>{
-//         console.log(res);
-//     }).catch((err)=>{
-//         console.log(err);
-//     });
-//     res.redirect("/home");
-// })
+app.get("/signup",(req,res)=>{
+res.render("signup.ejs");
+});
 
-// app.get("/add",(req,res)=>{
-// res.render("add.ejs");
-
-// });
-
-// app.put("/edit/:id",async(req,res)=>{
-// let {id}=req.params;
-// let data=req.body;
-// await List.findByIdAndUpdate(id,{
-//     title:data.title,
-//     description:data.description,
-//     image:{
-//         filename:"listingimage",
-//         url:data.img
-//     },
-//     country:data.country,
-//     location:data.location,
-//     price:data.price
-// },{runValidators:true,new:true})
-// res.redirect("/home");
-
-// });
-
-// app.get("/edit/:id",async(req,res)=>{
-// let {id}=req.params;
-// let data=await List.findById(id);
-// res.render("edit.ejs",{data});
-
-// });
-
-// app.delete("/delete/:id",async(req,res)=>{
-// let {id}=req.params;
-// await List.findByIdAndDelete(id)
-// .then((res)=>{
-//     console.log(res);
-// })
-// .catch((err)=>{
-//     consle.log(err);
-// });
-// res.redirect("/home");
-
-// });
-
-// app.get("/delete/:id",async(req,res)=>{
-//     let {id}=req.params;
-//     let data=await List.findById(id);
-//     res.render("delete.ejs",{data});
-// });
-
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
+app.get("/video",isloggedin,(req,res)=>{
+    let username=req.user.username;
+    res.render("video1.ejs",{username});
 });
 
 
 
 
-app.get("/video",(req,res)=>{
-    res.render("video1.ejs");
-});
-
-
-
-
-app.post("/video", (req, res) => {
+app.post("/video",isloggedin, (req, res) => {
     const link = req.body.videoLink;
-    const name = req.body.displayName;
+    const name = req.user.username;
 
     const match = link.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|.+?&v=))([^?&]+)/);
     const videoId = match ? match[1] : null;
@@ -145,24 +128,37 @@ app.post("/video", (req, res) => {
 });
 
 
-io.on("connection", (socket) => {
-    console.log("A user connected");
+io.on('connection', (socket) => {
+    console.log('A user connected:', socket.id);
+  
+    socket.on('chat message', (msg) => {
+      io.emit('chat message', msg); 
+    });
+  
+    socket.on('disconnect', () => {
+      console.log('User disconnected:', socket.id);
+    });
+  });
 
-    socket.on("join", (user1) => {
-        socket.username = user1;
-        io.emit("userJoined", user1);
+
+app.get("/login",(req,res)=>{
+    res.render("login.ejs");
     });
 
-    socket.on("sendMessage", (message) => {
-        const time = new Date().toLocaleTimeString();
-        io.emit("receiveMessage", { sender: socket.username, text: message, time });
-    });
+app.post("/login",passport.authenticate('local', { failureRedirect: '/login' ,failureFlash:true}),async(req,res)=>{
+    req.flash("success","Welcome to editor!");
+    res.redirect("/video");
+});
 
-    socket.on("disconnect", () => {
-        if (socket.username) {
-            io.emit("userLeft", socket.username);
-        }
+app.post('/logout', function(req, res, next){
+    req.logout(function(err) {
+      if (err) { return next(err); }
+      res.redirect('/signup');
     });
+  });
+
+app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
 });
 
 

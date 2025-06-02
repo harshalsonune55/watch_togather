@@ -12,6 +12,12 @@
 </head>
 
 <body>
+    <% if (success && success.length > 0) { %>
+        <div class="flash success"><%= success %></div>
+      <% } %>
+      <% if (error && error.length > 0) { %>
+        <div class="flash error"><%= error %></div>
+      <% } %>
     <button id="themeToggle"><i class="fa-solid fa-moon"></i>/<i class="fa-solid fa-sun"></i></button>
 
     <div class="container">
@@ -49,7 +55,7 @@
                 </div>
                 <div class="chat-input">
                     <input type="text" id="messageInput" placeholder="Type your message...">
-                    <button id="sendMessage" onclick="sendMessage()">Send</button>
+                    <button id="sendMessage" >Send</button>
                 </div>
             </div>
         </div>

@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const path = require("path");
+const os = require("os");
 const { Server } = require("socket.io");
 const methodOverride = require("method-override");
 const engine = require("ejs-mate");
@@ -17,6 +18,20 @@ const io = new Server(server, {
 });
 
 const port = process.env.PORT || 8080;
+
+function getLocalIpAddress() {
+  try {
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === "IPv4" && !net.internal) {
+          return net.address;
+        }
+      }
+    }
+  } catch (e) {}
+  return "localhost";
+}
 
 // Curated Web Series with multiple episodes ready to watch together!
 const WEB_SERIES = [
@@ -289,6 +304,13 @@ app.post("/video", (req, res) => {
   const name = (req.body.displayName || "User").trim();
   let roomId = (req.body.roomId || "").trim().toLowerCase();
 
+  // If user pasted a full URL or room path into roomId input, extract clean room code:
+  if (roomId.includes("/room/")) {
+    const parts = roomId.split("/room/");
+    roomId = parts[1].split("?")[0].split("#")[0].trim();
+  }
+  roomId = roomId.replace(/^[/]+/, "").split("?")[0].split("#")[0].trim();
+
   if (!roomId) {
     roomId = "watch-" + Math.random().toString(36).substring(2, 8);
   }
@@ -310,8 +332,13 @@ app.post("/video", (req, res) => {
 
 // 2. Direct Watch Together Room page
 app.get("/room/:roomId", (req, res) => {
-  const roomId = req.params.roomId.toLowerCase();
-  const userName = req.query.name || "";
+  let roomId = (req.params.roomId || "default-room").toLowerCase().trim();
+  if (roomId.includes("/room/")) {
+    roomId = roomId.split("/room/")[1].split("?")[0].trim();
+  }
+  roomId = roomId.split("?")[0].split("#")[0].trim();
+
+  const userName = (req.query.name || "").trim();
   const room = getOrCreateRoom(roomId);
 
   res.render("room.ejs", {
@@ -321,7 +348,9 @@ app.get("/room/:roomId", (req, res) => {
     sampleVideos: SAMPLE_VIDEOS,
     webSeries: WEB_SERIES,
     playlist: room.playlist,
-    currentEpisodeIndex: room.currentEpisodeIndex
+    currentEpisodeIndex: room.currentEpisodeIndex,
+    networkIp: getLocalIpAddress(),
+    serverPort: port
   });
 });
 
@@ -396,6 +425,7 @@ io.on("connection", (socket) => {
       const otherPeers = Array.from(room.users.keys()).filter((id) => id !== socket.id);
       if (otherPeers.length > 0) {
         socket.emit("initiate-call", { peerId: otherPeers[0] });
+        io.to(otherPeers[0]).emit("peer-ready-to-call", { peerId: socket.id, peerName: userName });
       }
     }
 
@@ -752,6 +782,23 @@ io.on("connection", (socket) => {
         candidate
       });
     }
+  });
+
+  socket.on("signal-reconnect", ({ targetId }) => {
+    if (targetId) {
+      io.to(targetId).emit("signal-reconnect", { senderId: socket.id });
+    } else if (currentRoomId) {
+      socket.to(currentRoomId).emit("signal-reconnect", { senderId: socket.id });
+    }
+  });
+
+  socket.on("peer-speaking", ({ speaking }) => {
+    if (!currentRoomId) return;
+    socket.to(currentRoomId).emit("peer-speaking", {
+      speaking: !!speaking,
+      userId: socket.id,
+      userName: currentUserName
+    });
   });
 
   socket.on("screen-share-status", ({ isSharing, streamId }) => {

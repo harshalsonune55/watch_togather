@@ -70,8 +70,41 @@ document.addEventListener("DOMContentLoaded", () => {
   window.syncEngine = syncEngine;
   window.webrtcCall = webrtcCall;
 
-  // Join Room Event
-  socket.emit("join-room", { roomId, userName });
+  // Join Room Session Function
+  function startRoomSession(name) {
+    userName = name;
+    localStorage.setItem("wt_username", name);
+    const localTag = document.getElementById("localUserNameTag");
+    if (localTag) localTag.textContent = `${name} (You)`;
+
+    socket.emit("join-room", { roomId, userName: name });
+  }
+
+  // Check if User Entered via Direct Link without a Name
+  const joinNameModal = document.getElementById("joinNameModal");
+  const formJoinName = document.getElementById("formJoinName");
+  const inputJoinName = document.getElementById("inputJoinName");
+  const hasUrlName = !!(window.ROOM_CONFIG.userName && window.ROOM_CONFIG.userName.trim());
+  const storedName = localStorage.getItem("wt_username");
+
+  if (!hasUrlName && !storedName && joinNameModal) {
+    joinNameModal.classList.add("open");
+    if (inputJoinName) {
+      inputJoinName.value = "Guest " + Math.floor(Math.random() * 900 + 100);
+      inputJoinName.select();
+    }
+  } else {
+    startRoomSession(userName);
+  }
+
+  if (formJoinName) {
+    formJoinName.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const enteredName = (inputJoinName.value || "").trim() || ("Guest " + Math.floor(Math.random() * 900 + 100));
+      if (joinNameModal) joinNameModal.classList.remove("open");
+      startRoomSession(enteredName);
+    });
+  }
 
   // Handle Room Initialization from Server
   socket.on("room-init", (data) => {
@@ -79,6 +112,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (userCountVal && data.users) {
       userCountVal.textContent = `${data.users.length}/2`;
+    }
+
+    if (data.users && data.users.length > 1) {
+      const partner = data.users.find(u => u.id !== data.yourId);
+      if (partner) {
+        const remoteUserName = document.getElementById("remoteUserName");
+        if (remoteUserName) remoteUserName.textContent = partner.name;
+        webrtcCall.setRemotePeer(partner.id, partner.name);
+      }
     }
 
     if (data.playlist) currentPlaylist = data.playlist;
@@ -134,12 +176,18 @@ document.addEventListener("DOMContentLoaded", () => {
   // User Joined / Left counters
   socket.on("user-joined", (data) => {
     if (userCountVal) userCountVal.textContent = `${data.userCount}/2`;
+    const remoteUserName = document.getElementById("remoteUserName");
+    if (remoteUserName && data.user) remoteUserName.textContent = data.user.name;
     showToast(`👋 ${data.user.name} joined the room!`);
+    webrtcCall.onUserJoined(data.user);
   });
 
   socket.on("user-left", (data) => {
     if (userCountVal) userCountVal.textContent = `${data.userCount}/2`;
+    const remoteUserName = document.getElementById("remoteUserName");
+    if (remoteUserName) remoteUserName.textContent = "Friend";
     showToast(`🚪 ${data.userName} left the room`);
+    webrtcCall.onUserLeft(data.userId);
   });
 
   // -----------------------------------------------
@@ -235,7 +283,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnResync) {
     btnResync.addEventListener("click", () => {
       syncEngine.requestForceResync();
-      showToast("⚡ Synchronizing with host...");
+      if (webrtcCall && webrtcCall.targetPeerId) {
+        webrtcCall.callPeer(webrtcCall.targetPeerId, true);
+      }
+      showToast("⚡ Synchronizing with partner...");
     });
   }
 
@@ -391,15 +442,120 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Copy Invite Link
+  // Bulletproof Clipboard Copy Helper (works on HTTPS, localhost, LAN IPs, and mobile)
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+    }
+    return fallbackCopy(text);
+  }
+
+  function fallbackCopy(text) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      ta.style.top = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const res = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return res ? Promise.resolve() : Promise.reject(new Error("Copy failed"));
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  // Share Modal & Invite Links
+  const cleanShareUrl = `${window.location.origin}/room/${encodeURIComponent(roomId)}`;
+  const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const netIp = window.ROOM_CONFIG.networkIp || "localhost";
+  const netPort = window.ROOM_CONFIG.serverPort || window.location.port || "8080";
+  const wifiShareUrl = (netIp && netIp !== "localhost")
+    ? `http://${netIp}:${netPort}/room/${encodeURIComponent(roomId)}`
+    : cleanShareUrl;
+
+  const shareModal = document.getElementById("shareModal");
+  const btnOpenShareModal = document.getElementById("btnOpenShareModal");
+  const btnCloseShareModal = document.getElementById("btnCloseShareModal");
+  const inputShareLink = document.getElementById("inputShareLink");
+  const btnCopyShareModalLink = document.getElementById("btnCopyShareModalLink");
+  const wifiShareSection = document.getElementById("wifiShareSection");
+  const inputWifiShareLink = document.getElementById("inputWifiShareLink");
+  const btnCopyWifiLink = document.getElementById("btnCopyWifiLink");
+  const btnCopyCodeOnly = document.getElementById("btnCopyCodeOnly");
+  const btnNativeShare = document.getElementById("btnNativeShare");
+
+  if (inputShareLink) inputShareLink.value = cleanShareUrl;
+  if (inputWifiShareLink) inputWifiShareLink.value = wifiShareUrl;
+  if (wifiShareSection && isLocalHost && netIp !== "localhost") {
+    wifiShareSection.style.display = "block";
+  }
+
+  // Header 1-Click Copy Button
   if (btnCopyLink) {
     btnCopyLink.addEventListener("click", () => {
-      const shareUrl = `${window.location.origin}/room/${encodeURIComponent(roomId)}`;
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        showToast("📋 Invite link copied to clipboard!");
+      // If user is on localhost, open the Share Modal so they can easily see WiFi option for other devices
+      if (isLocalHost && shareModal) {
+        shareModal.classList.add("open");
+      }
+      copyTextToClipboard(cleanShareUrl).then(() => {
+        showToast("📋 Room invite link copied to clipboard!");
       }).catch(() => {
         showToast("Room code: " + roomId);
       });
+    });
+  }
+
+  if (btnOpenShareModal && shareModal) {
+    btnOpenShareModal.addEventListener("click", () => {
+      shareModal.classList.add("open");
+    });
+  }
+
+  if (btnCloseShareModal && shareModal) {
+    btnCloseShareModal.addEventListener("click", () => {
+      shareModal.classList.remove("open");
+    });
+  }
+
+  if (btnCopyShareModalLink) {
+    btnCopyShareModalLink.addEventListener("click", () => {
+      copyTextToClipboard(cleanShareUrl).then(() => {
+        showToast("📋 Link copied to clipboard!");
+      });
+    });
+  }
+
+  if (btnCopyWifiLink) {
+    btnCopyWifiLink.addEventListener("click", () => {
+      copyTextToClipboard(wifiShareUrl).then(() => {
+        showToast("📋 WiFi link copied for friends on same network!");
+      });
+    });
+  }
+
+  if (btnCopyCodeOnly) {
+    btnCopyCodeOnly.addEventListener("click", () => {
+      copyTextToClipboard(roomId).then(() => {
+        showToast("📋 Room code copied: " + roomId);
+      });
+    });
+  }
+
+  // Native Web Share API (mobile/desktop browsers)
+  if (btnNativeShare && navigator.share) {
+    btnNativeShare.style.display = "block";
+    btnNativeShare.addEventListener("click", async () => {
+      try {
+        await navigator.share({
+          title: "Watch Together Room",
+          text: `Join my Watch Together room: ${roomId}!`,
+          url: cleanShareUrl
+        });
+      } catch (e) {}
     });
   }
 

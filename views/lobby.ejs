@@ -25,7 +25,7 @@
       <a href="#about" class="finsage-nav-link active">About us</a>
       <a href="#joinForm" class="finsage-nav-link">Direct Link</a>
       <a href="#joinForm" class="finsage-nav-link">Screen Share</a>
-      <a href="#joinForm" class="finsage-nav-link">Sync Engine</a>
+      <a href="#howToUse" class="finsage-nav-link">How to Use</a>
     </div>
 
     <a href="#joinForm" class="btn-mint-pill">
@@ -182,7 +182,103 @@
       </div>
 
     </div>
+
+    <!-- How to Use Section -->
+    <section id="howToUse" class="how-to-use">
+      <div class="how-to-use-inner">
+        <h2 class="how-to-use-title">How to Use</h2>
+        <div class="how-to-steps">
+          <div class="how-to-step">
+            <span class="step-badge">1</span>
+            <h3>Enter Name &amp; Link</h3>
+            <p>Type your name, paste a <strong>YouTube / MP4</strong> link, and click <strong>↗ Enter Synchronized Theater</strong> to launch your room.</p>
+          </div>
+          <div class="how-to-step">
+            <span class="step-badge">2</span>
+            <h3>Get Invite Link</h3>
+            <p>Click <strong>Copy Invite</strong> in the sidebar and share the link — your friend joins with <strong>zero-drift sync</strong> automatically.</p>
+          </div>
+          <div class="how-to-step">
+            <span class="step-badge">3</span>
+            <h3>Watch &amp; Talk</h3>
+            <p>Click <strong>Play/Pause</strong>, turn on <strong>HD cam + mic</strong>, hit <strong>Screen Share</strong> to broadcast into the theater, and use <strong>live chat + emoji reactions</strong>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
+
+  <style>
+    .how-to-use {
+      width: 100%;
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 60px 0;
+      background: transparent;
+      color: #fff;
+    }
+    .how-to-use-inner {
+      width: 100%;
+      max-width: none;
+      margin: 0;
+    }
+    .how-to-use-title {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 40px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .how-to-steps {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+    .how-to-step {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-card);
+      border-radius: 16px;
+      padding: 28px 24px;
+      flex: 1 1 300px;
+      text-align: left;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .how-to-step:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-hover);
+    }
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      background: var(--mint);
+      color: #0c0d11;
+      border-radius: 50%;
+      font-weight: 900;
+      font-size: 1.1rem;
+      margin-bottom: 14px;
+    }
+    .how-to-step h3 {
+      margin: 0 0 10px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fbbf24;
+    }
+    .how-to-step p {
+      margin: 0;
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .how-to-step strong {
+      color: #fff;
+      font-weight: 700;
+    }
+  </style>
 
   <script>
     const nameInput = document.getElementById('displayName');

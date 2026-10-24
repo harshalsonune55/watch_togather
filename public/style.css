@@ -946,6 +946,56 @@ body {
   gap: 12px;
 }
 
+/* Pastel Name Badges (Stage Badge & Person Tiles) */
+.pastel-name-pill {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--pastel-mint-bg);
+  color: var(--pastel-mint-text);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  z-index: 20;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.pastel-name-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pastel-name-pill.cyan { background: var(--pastel-cyan-bg); color: var(--pastel-cyan-text); }
+.pastel-name-pill.peach { background: var(--pastel-peach-bg); color: var(--pastel-peach-text); }
+.pastel-name-pill.coral { background: var(--pastel-coral-bg); color: var(--pastel-coral-text); }
+.pastel-name-pill.mint { background: var(--pastel-mint-bg); color: var(--pastel-mint-text); }
+.pastel-name-pill.lavender { background: var(--pastel-lavender-bg); color: var(--pastel-lavender-text); }
+
+.pastel-name-pill.small-badge {
+  font-size: 0.66rem;
+  padding: 3px 9px;
+  bottom: 8px;
+  left: 8px;
+}
+
+/* Mic Status Icons */
+.mic-status-icon { font-size: 0.6rem; }
+.mic-status-icon.muted { color: var(--danger); }
+
+/* Active Screen-Share Button Accent */
+.active-accent {
+  background: var(--mint) !important;
+  color: #0c0d11 !important;
+  border-color: var(--mint) !important;
+}
+
 /* ==========================================================================
    Small Profile Windows & Queue Column
    ========================================================================== */

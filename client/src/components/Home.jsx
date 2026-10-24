@@ -1,4 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+
+const DEMO_TABS = [
+  {
+    id: 'sync',
+    label: '🎬 Theater Sync',
+    title: 'Zero-Drift Synchronized Movie Theater',
+    desc: 'Watch any movie or YouTube stream in lockstep. Play, pause, seek, and playback rate automatically sync to the exact same frame across all friends.',
+    videoSrc: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    badgeText: 'Live Stream • 1080p 60fps'
+  },
+  {
+    id: 'ai',
+    label: '✨ Groq AI Assistant',
+    title: 'Instant Scene Recaps for Latecomers',
+    desc: 'Never pause the movie to explain what happened. Watchooo AI analyzes the scene timestamp and chat history to generate a crisp 3-bullet recap on demand.',
+    videoSrc: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    badgeText: '✨ Powered by Groq AI'
+  },
+  {
+    id: 'call',
+    label: '👥 2-Way HD Video Call',
+    title: 'Crystal Clear WebRTC Face-to-Face',
+    desc: 'See every laugh and reaction with HD video calling, animated speaking detection indicators, and synchronized low-latency audio.',
+    videoSrc: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    badgeText: 'WebRTC P2P • Turn Relay'
+  },
+  {
+    id: 'screen',
+    label: '🖥️ Screen Sharing',
+    title: 'Share Any App, Game, or Tab',
+    desc: 'Broadcast browser tabs, Netflix, Discord games, or coding sessions straight to the big theater screen with integrated audio streaming.',
+    videoSrc: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    badgeText: 'Screen Stream • Full Audio'
+  }
+];
 
 const DEMO_VIDEOS = [
   {
@@ -38,6 +73,32 @@ export default function Home({ onNavigate }) {
   const [roomId, setRoomId] = useState('');
   const [videoLink, setVideoLink] = useState('');
   const [activeFaq, setActiveFaq] = useState(null);
+
+  // Product Demo Showcase State
+  const [activeDemoTab, setActiveDemoTab] = useState('sync');
+  const [isDemoPlaying, setIsDemoPlaying] = useState(true);
+  const [isDemoMuted, setIsDemoMuted] = useState(true);
+  const demoVideoRef = useRef(null);
+
+  const toggleDemoPlay = () => {
+    if (demoVideoRef.current) {
+      if (isDemoPlaying) {
+        demoVideoRef.current.pause();
+      } else {
+        demoVideoRef.current.play().catch(() => {});
+      }
+      setIsDemoPlaying(!isDemoPlaying);
+    }
+  };
+
+  const toggleDemoMute = () => {
+    if (demoVideoRef.current) {
+      demoVideoRef.current.muted = !isDemoMuted;
+      setIsDemoMuted(!isDemoMuted);
+    }
+  };
+
+  const currentDemo = DEMO_TABS.find((t) => t.id === activeDemoTab) || DEMO_TABS[0];
 
   useEffect(() => {
     localStorage.setItem('wt_username', displayName);
@@ -105,8 +166,8 @@ export default function Home({ onNavigate }) {
         </div>
 
         <h1 className="home-hero-title">
-          Watch Any Video Together.<br />
-          <span className="gradient-text">In Total Real-Time Sync.</span>
+          <span className="hero-text-shimmer">Watch Any Video Together.</span><br />
+          <span className="gradient-text hero-text-pulse">In Total Real-Time Sync.</span>
         </h1>
 
         <p className="home-hero-subtitle">
@@ -181,12 +242,150 @@ export default function Home({ onNavigate }) {
         </div>
       </section>
 
-      {/* Instant Demo Videos Section */}
+      {/* Product Demo Showcase Section */}
       <section className="home-section" id="demos">
         <div className="section-header-centered">
-          <div className="section-pill">Demo Showcase</div>
-          <h2 className="section-title">Instant Demos Ready to Watch</h2>
-          <p className="section-subtitle">Click any demo below to launch a room and test synchronized playback immediately.</p>
+          <div className="section-pill">🎬 Live Product Demo</div>
+          <h2 className="section-title">See Watchooo in Action</h2>
+          <p className="section-subtitle">
+            Experience real-time playback synchronization, 2-way WebRTC video calling, and our built-in ✨ Groq AI co-pilot.
+          </p>
+        </div>
+
+        {/* Interactive Feature Tabs */}
+        <div className="demo-tabs-bar">
+          {DEMO_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`demo-tab-btn ${activeDemoTab === tab.id ? 'active' : ''}`}
+              onClick={() => {
+                setActiveDemoTab(tab.id);
+                setIsDemoPlaying(true);
+              }}
+            >
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Cinematic Product Demo Window */}
+        <div className="product-demo-showcase-wrapper">
+          <div className="demo-video-window">
+            {/* macOS Titlebar */}
+            <div className="demo-window-titlebar">
+              <div className="window-dots">
+                <span className="dot-circle red"></span>
+                <span className="dot-circle yellow"></span>
+                <span className="dot-circle green"></span>
+              </div>
+              <div className="window-address-bar">
+                <i className="fa-solid fa-lock" style={{ fontSize: '0.68rem', color: 'var(--mint)' }}></i>
+                <span>watchooo.com/room/{activeDemoTab}-party-demo</span>
+              </div>
+              <div className="window-status-pill">
+                <span className="live-dot-green"></span>
+                <span>In-Sync &bull; 2 Viewers</span>
+              </div>
+            </div>
+
+            {/* Video Stage & Overlays */}
+            <div className="demo-player-stage">
+              <video
+                ref={demoVideoRef}
+                key={currentDemo.videoSrc}
+                src={currentDemo.videoSrc}
+                className="demo-screen-video"
+                autoPlay
+                loop
+                muted={isDemoMuted}
+                playsInline
+                onClick={toggleDemoPlay}
+              />
+
+              {/* Floating AI Sparkle Badge */}
+              <div className="demo-ai-floating-badge">
+                <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--mint)' }}></i>
+                <span>{currentDemo.badgeText}</span>
+              </div>
+
+              {/* Simulated WebRTC PIP Video Calling Window */}
+              <div className="demo-pip-webcam">
+                <div className="demo-pip-header">
+                  <span>LIVE FACECAM</span>
+                  <i className="fa-solid fa-video"></i>
+                </div>
+                <div className="demo-pip-cams-row">
+                  <div className="demo-pip-avatar speaking">
+                    <i className="fa-solid fa-user-astronaut pip-avatar-icon"></i>
+                    <span className="pip-name-tag">Sam</span>
+                  </div>
+                  <div className="demo-pip-avatar">
+                    <i className="fa-solid fa-user pip-avatar-icon"></i>
+                    <span className="pip-name-tag">You</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Simulated Live Room Chat Overlay */}
+              <div className="demo-simulated-chat">
+                <div className="demo-chat-avatar">S</div>
+                <span><strong>Sam:</strong> That scene was incredible! 🔥</span>
+              </div>
+
+              {/* Center Play Button Overlay when paused */}
+              {!isDemoPlaying && (
+                <button type="button" onClick={toggleDemoPlay} className="demo-play-center-btn" title="Play Video Demo">
+                  <i className="fa-solid fa-play" style={{ marginLeft: '4px' }}></i>
+                </button>
+              )}
+
+              {/* Video Player Bottom Control Bar */}
+              <div className="demo-window-controls">
+                <button type="button" onClick={toggleDemoPlay} className="demo-ctrl-btn" title={isDemoPlaying ? 'Pause' : 'Play'}>
+                  <i className={`fa-solid ${isDemoPlaying ? 'fa-pause' : 'fa-play'}`}></i>
+                </button>
+
+                <div className="demo-track" onClick={toggleDemoPlay}>
+                  <div className="demo-track-fill"></div>
+                </div>
+
+                <button type="button" onClick={toggleDemoMute} className="demo-ctrl-btn" title={isDemoMuted ? 'Unmute Audio' : 'Mute Audio'}>
+                  <i className={`fa-solid ${isDemoMuted ? 'fa-volume-xmark' : 'fa-volume-high'}`}></i>
+                </button>
+
+                <button type="button" onClick={() => handleLaunchRoom(currentDemo.videoSrc)} className="btn-mint-pill" style={{ padding: '4px 12px', fontSize: '0.74rem' }}>
+                  <span>↗ Launch Live</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Caption Info Banner */}
+            <div className="demo-caption-banner">
+              <div className="demo-caption-text">
+                <h4 className="demo-caption-title">{currentDemo.title}</h4>
+                <p className="demo-caption-sub">{currentDemo.desc}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleLaunchRoom(currentDemo.videoSrc)}
+                className="btn-mint-pill"
+                style={{ flexShrink: 0, padding: '10px 18px', fontSize: '0.85rem' }}
+              >
+                <span>↗ Test in Full Room</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 1-Click Ready Demos Grid */}
+        <div style={{ textAlign: 'center', marginTop: '30px', marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', margin: '0 0 6px' }}>
+            Instant Pre-Loaded Demo Rooms
+          </h3>
+          <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', margin: 0 }}>
+            Click any movie or stream below to spin up a synchronized room immediately:
+          </p>
         </div>
 
         <div className="demo-cards-grid">
@@ -331,12 +530,20 @@ export default function Home({ onNavigate }) {
               a: 'Watchooo supports YouTube URLs, YouTube Shorts, direct MP4/WebM video streams, screen sharing, and local files on your computer.'
             }
           ].map((item, idx) => (
-            <div key={idx} className={`faq-item ${activeFaq === idx ? 'open' : ''}`} onClick={() => toggleFaq(idx)}>
+            <div
+              key={idx}
+              className={`faq-item ${activeFaq === idx ? 'open' : ''}`}
+              onClick={() => toggleFaq(idx)}
+            >
               <div className="faq-question">
                 <span>{item.q}</span>
-                <span className="faq-icon">{activeFaq === idx ? '−' : '+'}</span>
+                <span className="faq-icon-wrapper">
+                  <i className="fa-solid fa-chevron-down faq-chevron"></i>
+                </span>
               </div>
-              {activeFaq === idx && <div className="faq-answer">{item.a}</div>}
+              <div className={`faq-answer-collapse ${activeFaq === idx ? 'expanded' : ''}`}>
+                <div className="faq-answer-inner">{item.a}</div>
+              </div>
             </div>
           ))}
         </div>

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Signup Page</title>
+  <link rel="stylesheet" href="/signup-style.css">
+</head>
+<body>
+
+  <div class="signup-container">
+    <h2>Create Account</h2>
+    <% if (success && success.length > 0) { %>
+        <div class="flash success"><%= success %></div>
+      <% } %>
+      <% if (error && error.length > 0) { %>
+        <div class="flash error"><%= error %></div>
+      <% } %>
+    <form action="/signup" method="post">
+      <input type="text" id="username" placeholder="Username" name="Username" />
+      <input type="email" id="email" placeholder="Email" name="Email" />
+      <input type="password" id="password" placeholder="Password" name="Password" />
+      <input type="password" id="confirmPassword" placeholder="Confirm_Password" name="Confirm_Password" />
+      <button type="submit">Sign Up</button>
+      <p>if already have an account <a href="/login">login</a></p>
+    </form>
+  </div>
+</body>
+</html>

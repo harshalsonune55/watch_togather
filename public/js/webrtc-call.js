@@ -1,13 +1,14 @@
 /**
  * WebRTCCall - Two-Person Real-Time Video & Audio Calling Engine
- * Screen Sharing is displayed in the MAIN VIDEO SECTION (stage),
- * while both users' webcams remain live in the person view windows!
+ * Inspired by Virtual Huddle (Video Conference)
  *
- * Single Audio Stream Guarantee:
- * - When sharing your own screen: The website player is automatically MUTED so you only
- *   hear the original source tab/app (zero echo / zero dual audio!).
- * - The remote peer receives and plays the screen audio through the website.
- * - Background room video (YouTube/web series) is automatically paused during screen share.
+ * Features:
+ * - Robust STUN candidate exchange with Perfect Negotiation (W3C pattern)
+ * - Safe candidate queueing (zero ICE race conditions)
+ * - Resilient user media with graceful audio/video fallbacks
+ * - Uncompromised webcam display in Person View Tiles
+ * - Screen sharing displayed in MAIN STAGE with single-audio echo prevention
+ * - Auto-recovery on connection drops or ICE failures
  */
 class WebRTCCall {
   constructor(socket, roomId, userName) {
@@ -26,6 +27,7 @@ class WebRTCCall {
     this.remoteScreenStreamId = null;
     this.remoteScreenSharerName = null;
     this.targetPeerId = null;
+    this.remotePeerName = null;
 
     // DOM Elements
     this.localVideo = document.getElementById("localVideo");
@@ -49,17 +51,27 @@ class WebRTCCall {
     this.isCamOn = true;
     this.isMicOn = true;
     this.pendingCandidates = [];
+    this.makingOffer = false;
+    this.ignoreOffer = false;
+    this.reconnectTimer = null;
+    this.localAudioMeterActive = false;
+    this.remoteAudioMeterActive = false;
 
+    // Multi-Region High-Availability STUN Servers
     this.rtcConfig = {
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" }
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" },
+        { urls: "stun:stun.cloudflare.com:3478" },
+        { urls: "stun:stun.services.mozilla.com" }
       ],
       iceCandidatePoolSize: 10
     };
 
-    // Ensure user media is ready before signaling begins
+    // Ensure user media is initialized before signaling
     this.mediaReadyPromise = this.initUserMedia();
     this.initSocketSignaling();
     this.bindStageControls();
@@ -97,7 +109,6 @@ class WebRTCCall {
     if (!this.screenSharePlayer) return;
 
     if (isSelf) {
-      // Local Sharer: By default muted on the website to avoid duplicate audio
       if (this.screenSharePlayer.muted) {
         if (this.screenAudioIcon) this.screenAudioIcon.className = "fa-solid fa-volume-xmark";
         if (this.screenAudioLabel) this.screenAudioLabel.textContent = "Local Muted (Single Audio: Source Tab)";
@@ -108,7 +119,6 @@ class WebRTCCall {
         if (this.screenAudioSlider) this.screenAudioSlider.style.display = "inline-block";
       }
     } else {
-      // Remote Viewer: Listening from website
       if (this.screenSharePlayer.muted) {
         if (this.screenAudioIcon) this.screenAudioIcon.className = "fa-solid fa-volume-xmark";
         if (this.screenAudioLabel) this.screenAudioLabel.textContent = "Muted";
@@ -125,41 +135,99 @@ class WebRTCCall {
   }
 
   async initUserMedia() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.warn("navigator.mediaDevices.getUserMedia is not supported on this origin (requires HTTPS or localhost).");
+      this.showLocalAvatarPlaceholder(true);
+      this.localStream = new MediaStream();
+      return this.localStream;
+    }
+
     try {
+      // 1. Attempt Video + Audio with ideal resolutions
       this.localStream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 640 },
           height: { ideal: 480 },
           frameRate: { max: 30 }
         },
-        audio: true
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
       });
-
-      if (this.localVideo) {
-        this.localVideo.srcObject = this.localStream;
-      }
-
-      this.showLocalAvatarPlaceholder(false);
-      this.setupAudioMeter(this.localStream, this.localTile);
     } catch (err) {
-      console.warn("Camera/Mic not accessible or denied:", err);
-      this.showLocalAvatarPlaceholder(true);
-      this.localStream = new MediaStream();
+      console.warn("Could not acquire video and audio together:", err.message);
+      // Fallback 1: Video only
+      try {
+        this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      } catch (err2) {
+        // Fallback 2: Audio only
+        try {
+          this.localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+        } catch (err3) {
+          console.warn("Camera and microphone completely denied or unavailable:", err3.message);
+          this.localStream = new MediaStream();
+        }
+      }
     }
+
+    const hasVideo = this.localStream && this.localStream.getVideoTracks().length > 0;
+    const hasAudio = this.localStream && this.localStream.getAudioTracks().length > 0;
+
+    if (this.localVideo && hasVideo) {
+      this.localVideo.srcObject = this.localStream;
+      this.localVideo.play().catch(() => {});
+      this.showLocalAvatarPlaceholder(false);
+    } else {
+      this.showLocalAvatarPlaceholder(true);
+    }
+
+    if (hasAudio) {
+      this.setupAudioMeter(this.localStream, this.localTile);
+    }
+
+    return this.localStream;
   }
 
   initSocketSignaling() {
-    // 1. Ready to initiate call
+    // 1. Ready to initiate call as caller
     this.socket.on("initiate-call", async ({ peerId }) => {
+      console.log("WebRTC initiate-call received for peer:", peerId);
       this.targetPeerId = peerId;
       await this.mediaReadyPromise;
-      await this.createOffer(peerId);
+      await this.callPeer(peerId);
     });
 
-    // 2. Incoming offer
+    // 2. Peer is ready in room (callee or mutual awareness)
+    this.socket.on("peer-ready-to-call", async ({ peerId, peerName }) => {
+      console.log("WebRTC peer-ready-to-call received:", peerId, peerName);
+      this.targetPeerId = peerId;
+      if (peerName) {
+        this.remotePeerName = peerName;
+        this.updateRemoteUserNameUI(peerName);
+      }
+      await this.mediaReadyPromise;
+
+      // If call is not connected after 2.5s, auto-initiate
+      setTimeout(async () => {
+        if (!this.peerConnection || this.peerConnection.connectionState !== "connected") {
+          console.log("Peer ready fallback: calling peer", peerId);
+          await this.callPeer(peerId);
+        }
+      }, 2500);
+    });
+
+    // 3. Incoming Offer
     this.socket.on("signal-offer", async (payload) => {
-      const { senderId, senderName, offer, isScreenShare, screenStreamId } = payload;
+      const { senderId, senderName, offer, isScreenShare, screenStreamId } = payload || {};
+      if (!offer) return;
+
       this.targetPeerId = senderId;
+      if (senderName) {
+        this.remotePeerName = senderName;
+        this.updateRemoteUserNameUI(senderName);
+      }
       if (isScreenShare && screenStreamId) {
         this.remoteScreenStreamId = screenStreamId;
         this.remoteScreenSharerName = senderName;
@@ -167,33 +235,28 @@ class WebRTCCall {
 
       await this.mediaReadyPromise;
       await this.handleOffer(senderId, offer);
-
-      const peerNameTag = document.getElementById("remoteUserName");
-      if (peerNameTag && senderName) peerNameTag.textContent = senderName;
     });
 
-    // 3. Incoming answer
+    // 4. Incoming Answer
     this.socket.on("signal-answer", async ({ answer }) => {
-      if (this.peerConnection) {
-        await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-        this.flushPendingCandidates();
-      }
+      if (!answer) return;
+      await this.handleAnswer(answer);
     });
 
-    // 4. Incoming ICE candidate
+    // 5. Incoming ICE candidate
     this.socket.on("signal-ice", async ({ candidate }) => {
-      try {
-        if (this.peerConnection && this.peerConnection.remoteDescription) {
-          await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-        } else {
-          this.pendingCandidates.push(candidate);
-        }
-      } catch (e) {
-        console.warn("Error adding ICE candidate:", e);
-      }
+      if (!candidate) return;
+      await this.handleIceCandidate(candidate);
     });
 
-    // 5. Peer media state toggle (mic / cam)
+    // 6. Signal Reconnect Request
+    this.socket.on("signal-reconnect", async ({ senderId }) => {
+      console.log("WebRTC signal-reconnect requested by peer:", senderId);
+      this.targetPeerId = senderId;
+      await this.callPeer(senderId, true);
+    });
+
+    // 7. Peer Media State Toggle (Cam / Mic)
     this.socket.on("peer-media-toggle", ({ type, enabled }) => {
       if (type === "cam") {
         this.showRemoteAvatarPlaceholder(!enabled);
@@ -207,23 +270,18 @@ class WebRTCCall {
       }
     });
 
-    // 6. Peer speaking status (moving three dots animation)
+    // 8. Peer Speaking Status (Animated Three-Dots Badge)
     this.socket.on("peer-speaking", ({ speaking }) => {
       if (this.remoteTile) {
-        if (speaking) {
-          this.remoteTile.classList.add("speaking");
-        } else {
-          this.remoteTile.classList.remove("speaking");
-        }
+        this.remoteTile.classList.toggle("speaking", !!speaking);
       }
     });
 
-    // 7. Remote screen share status announcement
+    // 9. Remote Screen Share Status Announcement
     this.socket.on("screen-share-status", ({ isSharing, sharerName, streamId }) => {
       if (isSharing) {
         this.remoteScreenStreamId = streamId;
         this.remoteScreenSharerName = sharerName;
-        // Pause any running background video so it doesn't conflict
         if (window.syncEngine && window.syncEngine.isPlaying) {
           window.syncEngine.pauseLocal();
         }
@@ -235,71 +293,51 @@ class WebRTCCall {
       }
     });
 
-    // 7. User left
+    // 10. User Left
     this.socket.on("user-left", () => {
       this.closePeerConnection();
       this.showRemoteAvatarPlaceholder(true);
       this.showScreenShareStage(false);
-      const peerNameTag = document.getElementById("remoteUserName");
-      if (peerNameTag) peerNameTag.textContent = "Waiting for friend...";
+      this.updateRemoteUserNameUI("Waiting for friend...");
     });
   }
 
-  createPeerConnection(targetId) {
+  getOrCreatePeerConnection(targetId) {
+    if (this.peerConnection && this.peerConnection.connectionState !== "closed") {
+      return this.peerConnection;
+    }
+
     if (this.peerConnection) {
       this.closePeerConnection();
     }
 
-    this.pendingCandidates = [];
     this.peerConnection = new RTCPeerConnection(this.rtcConfig);
 
-    // Add local camera and mic tracks
+    // 1. Add local camera & mic tracks
     if (this.localStream) {
       this.localStream.getTracks().forEach((track) => {
-        this.peerConnection.addTrack(track, this.localStream);
+        try {
+          this.peerConnection.addTrack(track, this.localStream);
+        } catch (e) {
+          console.warn("Could not add local track:", e);
+        }
       });
     }
 
-    // If currently sharing screen, add screen tracks as well
+    // 2. Add local screen share tracks if active
     if (this.isScreenSharing && this.screenStream) {
       this.screenSenders = [];
       this.screenStream.getTracks().forEach((track) => {
-        const sender = this.peerConnection.addTrack(track, this.screenStream);
-        this.screenSenders.push(sender);
+        try {
+          const sender = this.peerConnection.addTrack(track, this.screenStream);
+          this.screenSenders.push(sender);
+        } catch (e) {
+          console.warn("Could not add screen track:", e);
+        }
       });
     }
 
-    // Handle remote tracks
-    this.peerConnection.ontrack = (event) => {
-      if (!event.streams || !event.streams[0]) return;
-      const stream = event.streams[0];
-
-      // Check if this incoming track/stream belongs to a screen share
-      const isScreen = (this.remoteScreenStreamId && stream.id === this.remoteScreenStreamId) ||
-                       (this.remoteCamStream && stream.id !== this.remoteCamStream.id);
-
-      if (isScreen) {
-        // Screen share track -> Route to MAIN STAGE VIDEO SECTION!
-        this.remoteScreenStream = stream;
-        if (this.screenSharePlayer) {
-          // REMOTE VIEWER: Unmuted so friend can hear the screen's audio cleanly!
-          this.screenSharePlayer.muted = false;
-          this.screenSharePlayer.volume = 1.0;
-          this.screenSharePlayer.srcObject = stream;
-        }
-        this.showScreenShareStage(true, this.remoteScreenSharerName || "Friend", false);
-      } else {
-        // Webcam track -> Route to PERSON VIEW WINDOW!
-        this.remoteCamStream = stream;
-        if (this.remoteVideo) {
-          this.remoteVideo.srcObject = stream;
-          this.showRemoteAvatarPlaceholder(false);
-          this.setupAudioMeter(stream, this.remoteTile);
-        }
-      }
-    };
-
-    // Handle ICE candidates
+    // 3. ICE Candidate Handler
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
         this.socket.emit("signal-ice", {
@@ -309,66 +347,272 @@ class WebRTCCall {
       }
     };
 
+    // 4. Remote Track Handler
+    this.peerConnection.ontrack = (event) => {
+      console.log("WebRTC ontrack received:", event.track.kind, event.track.id);
+
+      let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+      if (!stream) {
+        stream = new MediaStream([event.track]);
+      }
+
+      // Explicit check: is this track screen share?
+      const isScreen = (this.remoteScreenStreamId && stream.id === this.remoteScreenStreamId) ||
+                       (this.remoteScreenStreamId && event.track.id === this.remoteScreenStreamId);
+
+      if (isScreen) {
+        // Screen Share Track -> MAIN VIDEO THEATER STAGE
+        this.remoteScreenStream = stream;
+        if (this.screenSharePlayer) {
+          this.screenSharePlayer.muted = false;
+          this.screenSharePlayer.volume = 1.0;
+          this.screenSharePlayer.srcObject = stream;
+          this.screenSharePlayer.play().catch(() => {});
+        }
+        this.showScreenShareStage(true, this.remoteScreenSharerName || "Friend", false);
+      } else {
+        // Webcam / Mic Track -> PERSON VIEW TILE
+        if (event.track.kind === "video") {
+          this.remoteCamStream = stream;
+          if (this.remoteVideo) {
+            this.remoteVideo.srcObject = stream;
+            const playPromise = this.remoteVideo.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((err) => {
+                console.warn("remoteVideo.play() prevented by browser autoplay policy:", err);
+                const unlock = () => {
+                  if (this.remoteVideo) this.remoteVideo.play().catch(() => {});
+                };
+                document.addEventListener("click", unlock, { once: true });
+              });
+            }
+          }
+          this.showRemoteAvatarPlaceholder(false);
+        } else if (event.track.kind === "audio") {
+          if (this.remoteVideo && !this.remoteVideo.srcObject) {
+            this.remoteVideo.srcObject = stream;
+            this.remoteVideo.play().catch(() => {});
+          }
+          this.setupAudioMeter(stream, this.remoteTile);
+        } else {
+          if (this.remoteVideo && !this.remoteVideo.srcObject) {
+            this.remoteVideo.srcObject = stream;
+          }
+          this.showRemoteAvatarPlaceholder(false);
+        }
+      }
+    };
+
+    // 5. Connection State Monitoring
     this.peerConnection.onconnectionstatechange = () => {
-      if (
-        this.peerConnection.connectionState === "disconnected" ||
-        this.peerConnection.connectionState === "failed"
-      ) {
-        this.showRemoteAvatarPlaceholder(true);
+      const state = this.peerConnection.connectionState;
+      console.log("WebRTC connectionState:", state);
+      if (state === "connected") {
+        this.showRemoteAvatarPlaceholder(false);
+        if (this.remoteVideo && this.remoteVideo.paused) {
+          this.remoteVideo.play().catch(() => {});
+        }
+      } else if (state === "disconnected" || state === "failed") {
+        console.warn("WebRTC disconnected or failed. Attempting auto-reconnect...");
+        this.attemptAutoReconnect();
+      }
+    };
+
+    // 6. ICE Connection State Monitoring
+    this.peerConnection.oniceconnectionstatechange = () => {
+      const iceState = this.peerConnection.iceConnectionState;
+      console.log("WebRTC iceConnectionState:", iceState);
+      if (iceState === "failed") {
+        if (typeof this.peerConnection.restartIce === "function") {
+          try {
+            this.peerConnection.restartIce();
+          } catch (e) {
+            this.attemptAutoReconnect();
+          }
+        } else {
+          this.attemptAutoReconnect();
+        }
       }
     };
 
     return this.peerConnection;
   }
 
-  async flushPendingCandidates() {
+  async callPeer(targetId, forceNew = false) {
+    if (forceNew) {
+      this.closePeerConnection();
+    }
+    this.targetPeerId = targetId;
+    const pc = this.getOrCreatePeerConnection(targetId);
+
+    try {
+      this.makingOffer = true;
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
+
+      if (pc.signalingState !== "stable") return;
+
+      await pc.setLocalDescription(offer);
+
+      this.socket.emit("signal-offer", {
+        targetId,
+        offer: pc.localDescription
+      });
+    } catch (err) {
+      console.warn("Error creating offer:", err);
+    } finally {
+      this.makingOffer = false;
+    }
+  }
+
+  async handleOffer(senderId, offer) {
+    this.targetPeerId = senderId;
+    const isPolite = this.socket.id < senderId;
+    const pc = this.getOrCreatePeerConnection(senderId);
+
+    try {
+      const isOffer = offer.type === "offer" || !offer.type;
+      const offerCollision = isOffer && (this.makingOffer || pc.signalingState !== "stable");
+      this.ignoreOffer = !isPolite && offerCollision;
+
+      if (this.ignoreOffer) {
+        console.warn("WebRTC Glare: Impolite peer ignoring colliding offer");
+        return;
+      }
+
+      if (offerCollision) {
+        console.warn("WebRTC Glare: Polite peer rolling back to handle colliding offer");
+        await Promise.all([
+          pc.setLocalDescription({ type: "rollback" }),
+          pc.setRemoteDescription(new RTCSessionDescription(offer))
+        ]);
+      } else {
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      }
+
+      await this.flushPendingCandidates();
+
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      this.socket.emit("signal-answer", {
+        targetId: senderId,
+        answer: pc.localDescription
+      });
+    } catch (err) {
+      console.warn("Error handling offer:", err);
+    }
+  }
+
+  async handleAnswer(answer) {
     if (!this.peerConnection) return;
-    while (this.pendingCandidates.length > 0) {
-      const candidate = this.pendingCandidates.shift();
+    try {
+      await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+      await this.flushPendingCandidates();
+    } catch (err) {
+      console.warn("Error setting remote answer description:", err);
+    }
+  }
+
+  async handleIceCandidate(candidate) {
+    if (!candidate) return;
+    try {
+      if (
+        this.peerConnection &&
+        this.peerConnection.remoteDescription &&
+        this.peerConnection.remoteDescription.type
+      ) {
+        await this.peerConnection.addIceCandidate(candidate);
+      } else {
+        this.pendingCandidates.push(candidate);
+      }
+    } catch (err) {
+      console.warn("Error adding ICE candidate:", err);
+    }
+  }
+
+  async flushPendingCandidates() {
+    if (!this.peerConnection || !this.peerConnection.remoteDescription) return;
+    const candidates = [...this.pendingCandidates];
+    this.pendingCandidates = [];
+    for (const cand of candidates) {
       try {
-        await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (e) {
-        console.warn("Failed to flush ICE candidate:", e);
+        await this.peerConnection.addIceCandidate(cand);
+      } catch (err) {
+        console.warn("Error flushing queued ICE candidate:", err);
       }
     }
   }
 
-  async createOffer(targetId) {
-    const pc = this.createPeerConnection(targetId);
-    const offer = await pc.createOffer({
-      offerToReceiveAudio: true,
-      offerToReceiveVideo: true
-    });
-    await pc.setLocalDescription(offer);
-
-    this.socket.emit("signal-offer", {
-      targetId,
-      offer
-    });
+  attemptAutoReconnect() {
+    if (this.reconnectTimer || !this.targetPeerId) return;
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null;
+      console.log("Attempting automatic WebRTC reconnect with peer:", this.targetPeerId);
+      this.socket.emit("signal-reconnect", { targetId: this.targetPeerId });
+      await this.callPeer(this.targetPeerId, true);
+    }, 1800);
   }
 
-  async handleOffer(senderId, offer) {
-    const pc = this.createPeerConnection(senderId);
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    this.flushPendingCandidates();
+  onUserJoined(user) {
+    if (!user || !user.id) return;
+    this.targetPeerId = user.id;
+    this.remotePeerName = user.name;
+    this.updateRemoteUserNameUI(user.name);
+  }
 
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+  onUserLeft(userId) {
+    if (this.targetPeerId === userId) {
+      this.closePeerConnection();
+      this.showRemoteAvatarPlaceholder(true);
+      this.showScreenShareStage(false);
+      this.updateRemoteUserNameUI("Waiting for friend...");
+    }
+  }
 
-    this.socket.emit("signal-answer", {
-      targetId: senderId,
-      answer
-    });
+  setRemotePeer(id, name) {
+    this.targetPeerId = id;
+    if (name) {
+      this.remotePeerName = name;
+      this.updateRemoteUserNameUI(name);
+    }
+  }
+
+  updateRemoteUserNameUI(name) {
+    const peerNameTag = document.getElementById("remoteUserName");
+    const sidebarFriendName = document.getElementById("sidebarFriendName");
+    const sidebarDot = document.getElementById("sidebarFriendStatusDot");
+
+    if (peerNameTag && name) {
+      peerNameTag.textContent = name;
+    }
+    if (sidebarFriendName && name) {
+      sidebarFriendName.textContent = name;
+    }
+    if (sidebarDot) {
+      sidebarDot.style.color = (name && name !== "Waiting for friend...") ? "var(--mint)" : "var(--text-dim)";
+    }
   }
 
   closePeerConnection() {
     if (this.peerConnection) {
+      this.peerConnection.onicecandidate = null;
+      this.peerConnection.ontrack = null;
+      this.peerConnection.onconnectionstatechange = null;
+      this.peerConnection.oniceconnectionstatechange = null;
       this.peerConnection.close();
       this.peerConnection = null;
     }
     if (this.remoteVideo) {
       this.remoteVideo.srcObject = null;
     }
+    this.remoteCamStream = null;
+    this.remoteScreenStream = null;
+    this.remoteScreenStreamId = null;
+    this.remoteScreenSharerName = null;
+    this.pendingCandidates = [];
   }
 
   // -----------------------------------------------
@@ -384,6 +628,11 @@ class WebRTCCall {
   }
 
   async startScreenShare() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      alert("Screen sharing is not supported by your browser or requires HTTPS.");
+      return;
+    }
+
     try {
       this.screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: {
@@ -395,57 +644,55 @@ class WebRTCCall {
 
       this.isScreenSharing = true;
 
-      // Automatically pause any running room video so background audio doesn't conflict!
+      // Automatically pause any running room video
       if (window.syncEngine && window.syncEngine.isPlaying) {
         window.syncEngine.pauseLocal();
       }
 
-      // 1. Show the screen share in the MAIN VIDEO SECTION for the local user!
-      // CRITICAL FIX FOR DUAL AUDIO:
-      // The local user is MUTED on the website player because they already hear audio
-      // directly from their source tab/window. This guarantees a SINGLE audio stream!
+      // Display in main theater stage for local user
+      // Local user is MUTED on website player to guarantee single audio source
       if (this.screenSharePlayer) {
         this.screenSharePlayer.muted = true;
         this.screenSharePlayer.volume = 0;
         this.screenSharePlayer.srcObject = this.screenStream;
+        this.screenSharePlayer.play().catch(() => {});
       }
       this.showScreenShareStage(true, "You", true);
 
-      // 2. Ensure camera video REMAINS in the local person tile!
-      if (this.localVideo && this.localStream) {
+      // Ensure local camera video remains in local person tile
+      if (this.localVideo && this.localStream && this.localStream.getVideoTracks().length > 0) {
         this.localVideo.srcObject = this.localStream;
       }
 
-      // 3. Add the screen share tracks to the active PeerConnection
+      // Add screen tracks to existing PeerConnection without breaking webcam
       this.screenSenders = [];
-      if (this.peerConnection) {
+      if (this.peerConnection && this.targetPeerId) {
         this.screenStream.getTracks().forEach((track) => {
           const sender = this.peerConnection.addTrack(track, this.screenStream);
           this.screenSenders.push(sender);
         });
 
-        // Trigger renegotiation so peer receives the additional screen share stream
+        // Renegotiate with peer
         const offer = await this.peerConnection.createOffer();
         await this.peerConnection.setLocalDescription(offer);
         this.socket.emit("signal-offer", {
           targetId: this.targetPeerId,
-          offer,
+          offer: this.peerConnection.localDescription,
           isScreenShare: true,
           screenStreamId: this.screenStream.id
         });
       }
 
-      // 4. Notify peers via socket
+      // Broadcast screen share status
       this.socket.emit("screen-share-status", {
         isSharing: true,
         streamId: this.screenStream.id
       });
 
-      // Update control button
       const btn = document.getElementById("btnShareScreen");
       if (btn) btn.classList.add("active-accent");
 
-      // Handle user stopping screen share via browser's native banner ("Stop sharing")
+      // Handle native browser "Stop sharing" bar
       const screenVideoTrack = this.screenStream.getVideoTracks()[0];
       if (screenVideoTrack) {
         screenVideoTrack.onended = () => {
@@ -470,7 +717,7 @@ class WebRTCCall {
       this.screenStream = null;
     }
 
-    // 2. Remove screen senders from PeerConnection
+    // 2. Remove screen senders from PeerConnection without breaking webcam
     if (this.peerConnection && this.screenSenders && this.screenSenders.length > 0) {
       this.screenSenders.forEach((sender) => {
         try {
@@ -485,13 +732,13 @@ class WebRTCCall {
         await this.peerConnection.setLocalDescription(offer);
         this.socket.emit("signal-offer", {
           targetId: this.targetPeerId,
-          offer,
+          offer: this.peerConnection.localDescription,
           screenShareEnded: true
         });
       } catch (e) {}
     }
 
-    // 3. Clear main stage screen share display and revert to synchronized video
+    // 3. Clear main stage screen share display
     if (this.screenSharePlayer) {
       this.screenSharePlayer.srcObject = null;
     }
@@ -559,18 +806,54 @@ class WebRTCCall {
   }
 
   // -----------------------------------------------
-  // Camera & Microphone Controls (Person View Window)
+  // Camera & Microphone Controls
   // -----------------------------------------------
 
-  toggleCamera() {
-    if (!this.localStream) return;
-    const videoTracks = this.localStream.getVideoTracks();
-    if (videoTracks.length === 0) return;
+  async toggleCamera() {
+    let videoTracks = this.localStream ? this.localStream.getVideoTracks() : [];
 
-    this.isCamOn = !this.isCamOn;
-    videoTracks.forEach((track) => (track.enabled = this.isCamOn));
+    // If no video track exists yet, request camera permission on demand
+    if (videoTracks.length === 0) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Camera access requires HTTPS or localhost.");
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { max: 30 } }
+        });
+        const newTrack = stream.getVideoTracks()[0];
+        if (newTrack) {
+          if (!this.localStream) this.localStream = new MediaStream();
+          this.localStream.addTrack(newTrack);
+          if (this.localVideo) {
+            this.localVideo.srcObject = this.localStream;
+            this.localVideo.play().catch(() => {});
+          }
+          this.isCamOn = true;
+          this.showLocalAvatarPlaceholder(false);
 
-    this.showLocalAvatarPlaceholder(!this.isCamOn);
+          if (this.peerConnection) {
+            const sender = this.peerConnection.getSenders().find(s => s.track && s.track.kind === "video");
+            if (sender) {
+              await sender.replaceTrack(newTrack);
+            } else {
+              this.peerConnection.addTrack(newTrack, this.localStream);
+              if (this.targetPeerId) {
+                await this.callPeer(this.targetPeerId);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not activate camera:", err);
+        return;
+      }
+    } else {
+      this.isCamOn = !this.isCamOn;
+      videoTracks.forEach((track) => (track.enabled = this.isCamOn));
+      this.showLocalAvatarPlaceholder(!this.isCamOn);
+    }
 
     const btn = document.getElementById("btnToggleCam");
     if (btn) {
@@ -583,13 +866,44 @@ class WebRTCCall {
     this.socket.emit("media-toggle", { type: "cam", enabled: this.isCamOn });
   }
 
-  toggleMicrophone() {
-    if (!this.localStream) return;
-    const audioTracks = this.localStream.getAudioTracks();
-    if (audioTracks.length === 0) return;
+  async toggleMicrophone() {
+    let audioTracks = this.localStream ? this.localStream.getAudioTracks() : [];
 
-    this.isMicOn = !this.isMicOn;
-    audioTracks.forEach((track) => (track.enabled = this.isMicOn));
+    // If no audio track exists yet, request microphone permission on demand
+    if (audioTracks.length === 0) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Microphone access requires HTTPS or localhost.");
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const newTrack = stream.getAudioTracks()[0];
+        if (newTrack) {
+          if (!this.localStream) this.localStream = new MediaStream();
+          this.localStream.addTrack(newTrack);
+          this.isMicOn = true;
+          this.setupAudioMeter(this.localStream, this.localTile);
+
+          if (this.peerConnection) {
+            const sender = this.peerConnection.getSenders().find(s => s.track && s.track.kind === "audio");
+            if (sender) {
+              await sender.replaceTrack(newTrack);
+            } else {
+              this.peerConnection.addTrack(newTrack, this.localStream);
+              if (this.targetPeerId) {
+                await this.callPeer(this.targetPeerId);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not activate microphone:", err);
+        return;
+      }
+    } else {
+      this.isMicOn = !this.isMicOn;
+      audioTracks.forEach((track) => (track.enabled = this.isMicOn));
+    }
 
     const btn = document.getElementById("btnToggleMic");
     const micIcon = document.getElementById("localMicIcon");
@@ -609,15 +923,29 @@ class WebRTCCall {
   }
 
   // -----------------------------------------------
-  // Speech & Audio Level Detector (Visual Speaking Aura)
+  // Speech & Audio Level Detector (Visual Aura)
   // -----------------------------------------------
 
   setupAudioMeter(stream, targetTile) {
     if (!stream || stream.getAudioTracks().length === 0 || !targetTile) return;
 
+    if (targetTile === this.localTile && this.localAudioMeterActive) return;
+    if (targetTile === this.remoteTile && this.remoteAudioMeterActive) return;
+
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
       const audioCtx = new AudioCtx();
+
+      if (audioCtx.state === "suspended") {
+        const resumeAudio = () => {
+          if (audioCtx.state === "suspended") {
+            audioCtx.resume();
+          }
+        };
+        document.addEventListener("click", resumeAudio, { once: true });
+      }
+
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 256;
@@ -628,7 +956,15 @@ class WebRTCCall {
 
       let isSpeakingBroadcast = false;
 
+      if (targetTile === this.localTile) this.localAudioMeterActive = true;
+      if (targetTile === this.remoteTile) this.remoteAudioMeterActive = true;
+
       const checkVolume = () => {
+        if (!this.peerConnection && targetTile === this.remoteTile) {
+          this.remoteAudioMeterActive = false;
+          return;
+        }
+
         analyser.getByteFrequencyData(dataArray);
         let sum = 0;
         for (let i = 0; i < bufferLength; i++) {

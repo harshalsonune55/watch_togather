@@ -239,6 +239,7 @@ io.on("connection", (socket) => {
       const otherPeers = Array.from(room.users.keys()).filter((id) => id !== socket.id);
       if (otherPeers.length > 0) {
         socket.emit("initiate-call", { peerId: otherPeers[0] });
+        io.to(otherPeers[0]).emit("peer-ready-to-call", { peerId: socket.id, peerName: userName });
       }
     }
 
@@ -445,6 +446,14 @@ io.on("connection", (socket) => {
         senderId: socket.id,
         candidate
       });
+    }
+  });
+
+  socket.on("signal-reconnect", ({ targetId }) => {
+    if (targetId) {
+      io.to(targetId).emit("signal-reconnect", { senderId: socket.id });
+    } else if (currentRoomId) {
+      socket.to(currentRoomId).emit("signal-reconnect", { senderId: socket.id });
     }
   });
 

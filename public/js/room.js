@@ -7,7 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let userName = window.ROOM_CONFIG.userName;
 
   if (!userName || userName.trim() === "") {
-    userName = localStorage.getItem("wt_username") || "Alex";
+    userName = localStorage.getItem("wt_username") || "Guest " + Math.floor(100 + Math.random() * 900);
   }
   localStorage.setItem("wt_username", userName);
 
@@ -76,6 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (remoteUserName) remoteUserName.textContent = partner.name;
         if (sidebarFriendName) sidebarFriendName.textContent = partner.name;
         if (sidebarFriendStatusDot) sidebarFriendStatusDot.style.color = "var(--mint)";
+        webrtcCall.setRemotePeer(partner.id, partner.name);
       }
     }
 
@@ -120,12 +121,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (sidebarFriendName) sidebarFriendName.textContent = data.user.name;
     if (sidebarFriendStatusDot) sidebarFriendStatusDot.style.color = "var(--mint)";
     showToast(`👋 ${data.user.name} joined the room!`);
+    webrtcCall.onUserJoined(data.user);
   });
 
   socket.on("user-left", (data) => {
-    if (remoteUserName) remoteUserName.textContent = "Friend (Offline)";
+    if (remoteUserName) remoteUserName.textContent = "Waiting for friend...";
+    if (sidebarFriendName) sidebarFriendName.textContent = "Friend";
     if (sidebarFriendStatusDot) sidebarFriendStatusDot.style.color = "var(--text-dim)";
     showToast(`🚪 ${data.userName} left the room`);
+    webrtcCall.onUserLeft(data.userId);
   });
 
   // -----------------------------------------------
@@ -179,6 +183,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Resync Button
   const handleResync = () => {
     syncEngine.requestForceResync();
+    if (webrtcCall && webrtcCall.targetPeerId) {
+      webrtcCall.callPeer(webrtcCall.targetPeerId, true);
+    }
     showToast("⚡ Synchronizing with partner...");
   };
   if (btnResync) btnResync.addEventListener("click", handleResync);

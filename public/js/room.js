@@ -106,33 +106,20 @@ document.addEventListener("DOMContentLoaded", () => {
     if (data.users && data.users.length > 1) {
       const partner = data.users.find(u => u.id !== data.yourId);
       if (partner) {
-        if (remoteUserName) remoteUserName.textContent = partner.name;
+        const remoteUserNameEl = document.getElementById("remoteUserName");
+        if (remoteUserNameEl) remoteUserNameEl.textContent = partner.name;
         if (sidebarFriendName) sidebarFriendName.textContent = partner.name;
         if (sidebarFriendStatusDot) sidebarFriendStatusDot.style.color = "var(--mint)";
-      }
-    }
-
-    if (data.users && data.users.length > 1) {
-      const partner = data.users.find(u => u.id !== data.yourId);
-      if (partner) {
-        const remoteUserName = document.getElementById("remoteUserName");
-        if (remoteUserName) remoteUserName.textContent = partner.name;
         webrtcCall.setRemotePeer(partner.id, partner.name);
       }
     }
 
-    if (data.playlist) currentPlaylist = data.playlist;
-    if (typeof data.currentEpisodeIndex === "number") currentEpisodeIndex = data.currentEpisodeIndex;
-    if (data.webSeries) allSeries = data.webSeries;
-    if (data.currentSeries) activeSeriesId = data.currentSeries.id;
-
-    updateEpisodePillUI();
-    renderEpisodesList();
-
     // Load initial video
     if (data.video) {
       syncEngine.loadVideo(data.video.type, data.video.source, data.video.title);
-      if (stageBadgeText) stageBadgeText.textContent = data.video.title.substring(0, 28);
+      if (stageBadgeText && data.video.title) {
+        stageBadgeText.textContent = data.video.title.substring(0, 28);
+      }
       if (data.video.currentTime > 0) {
         setTimeout(() => {
           syncEngine.seekTo(data.video.currentTime);
@@ -166,18 +153,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // User Joined / Left
   socket.on("user-joined", (data) => {
-    if (userCountVal) userCountVal.textContent = `${data.userCount}/2`;
-    const remoteUserName = document.getElementById("remoteUserName");
-    if (remoteUserName && data.user) remoteUserName.textContent = data.user.name;
+    const remoteUserNameEl = document.getElementById("remoteUserName");
+    if (remoteUserNameEl && data.user) remoteUserNameEl.textContent = data.user.name;
+    if (sidebarFriendName && data.user) sidebarFriendName.textContent = data.user.name;
+    if (sidebarFriendStatusDot) sidebarFriendStatusDot.style.color = "var(--mint)";
     showToast(`👋 ${data.user.name} joined the room!`);
     webrtcCall.onUserJoined(data.user);
   });
 
   socket.on("user-left", (data) => {
-    if (userCountVal) userCountVal.textContent = `${data.userCount}/2`;
-    const remoteUserName = document.getElementById("remoteUserName");
-    if (remoteUserName) remoteUserName.textContent = "Friend";
-    showToast(`🚪 ${data.userName} left the room`);
+    const remoteUserNameEl = document.getElementById("remoteUserName");
+    if (remoteUserNameEl) remoteUserNameEl.textContent = "Waiting for friend...";
+    if (sidebarFriendName) sidebarFriendName.textContent = "Waiting for friend...";
+    if (sidebarFriendStatusDot) sidebarFriendStatusDot.style.color = "";
+    showToast(`🚪 ${data.userName || "Friend"} left the room`);
     webrtcCall.onUserLeft(data.userId);
   });
 
@@ -230,28 +219,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Resync Button
-  if (btnResync) {
-    btnResync.addEventListener("click", () => {
-      syncEngine.requestForceResync();
-      if (webrtcCall && webrtcCall.targetPeerId) {
-        webrtcCall.callPeer(webrtcCall.targetPeerId, true);
-      }
-      showToast("⚡ Synchronizing with partner...");
-    });
-  }
-
-  // Cinema View (Floating PIP Mode)
-  if (btnCinemaView && theaterLayout) {
-    btnCinemaView.addEventListener("click", () => {
-      const isCinema = theaterLayout.classList.toggle("cinema-view");
-      btnCinemaView.classList.toggle("active", isCinema);
-      showToast(isCinema ? "🎭 Cinema Mode Enabled (Facecam Floating)" : "🖥️ Theater Sidebar View");
-    });
-  }
-
-  // Resync Button
   const handleResync = () => {
     syncEngine.requestForceResync();
+    if (webrtcCall && webrtcCall.targetPeerId) {
+      webrtcCall.callPeer(webrtcCall.targetPeerId, true);
+    }
     showToast("⚡ Synchronizing with partner...");
   };
   if (btnResync) btnResync.addEventListener("click", handleResync);
@@ -420,6 +392,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Header 1-Click Copy Button
+  const btnCopyLink = document.getElementById("btnCopyLink");
   if (btnCopyLink) {
     btnCopyLink.addEventListener("click", () => {
       // If user is on localhost, open the Share Modal so they can easily see WiFi option for other devices

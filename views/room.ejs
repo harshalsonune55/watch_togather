@@ -236,20 +236,21 @@
               <span class="speaking-dot d3"></span>
             </div>
             
-            <video id="remoteVideo" class="huddle-stream-video" autoplay playsinline></video>
+            <video id="remoteVideo" class="huddle-stream-video" autoplay muted playsinline></video>
+            <audio id="remoteAudio" autoplay playsinline></audio>
 
             <!-- Illustrated Center Avatar Placeholder -->
             <div class="tile-avatar-placeholder show" id="remotePlaceholder">
               <div class="huddle-center-avatar lavender">
                 <i class="fa-solid fa-user-astronaut"></i>
               </div>
-              <div class="tile-placeholder-text">Waiting for friend...</div>
+              <div class="tile-placeholder-text" id="remotePlaceholderText">Waiting for friend...</div>
             </div>
 
             <!-- Pastel Peach Badge: Remote User Profile -->
             <div class="pastel-name-pill peach small-badge">
               <i class="fa-solid fa-microphone" id="remoteMicIcon"></i>
-              <span id="remoteUserName">Darrell Steward</span>
+              <span id="remoteUserName">Waiting for friend...</span>
             </div>
           </div>
 
@@ -275,9 +276,11 @@
             <!-- Pastel Coral Badge: Local User Profile -->
             <div class="pastel-name-pill coral small-badge">
               <i class="fa-solid fa-microphone" id="localMicIcon"></i>
-              <span id="localUserName">Bessie Cooper (You)</span>
+              <span id="localUserName"><%= initialUserName ? initialUserName + ' (You)' : 'You' %></span>
             </div>
           </div>
+
+          <input type="file" id="inputLocalFile" accept="video/mp4,video/webm,video/ogg,video/mkv" style="display: none;">
 
           <!-- Small Window 3: Live In-Room Chat Section -->
           <div class="huddle-video-card huddle-chat-inline-card" id="chatCardTile">

@@ -19,6 +19,20 @@ const io = new Server(server, {
 
 const port = process.env.PORT || 8080;
 
+function getLocalIpAddress() {
+  try {
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === "IPv4" && !net.internal) {
+          return net.address;
+        }
+      }
+    }
+  } catch (e) {}
+  return "localhost";
+}
+
 function parseVideoSource(input) {
   if (!input || typeof input !== "string" || input.trim() === "") {
     return {
@@ -191,10 +205,6 @@ app.get("/room/:roomId", (req, res) => {
     roomId,
     initialUserName: userName,
     video: room.video,
-    sampleVideos: SAMPLE_VIDEOS,
-    webSeries: WEB_SERIES,
-    playlist: room.playlist,
-    currentEpisodeIndex: room.currentEpisodeIndex,
     networkIp: getLocalIpAddress(),
     serverPort: port
   });

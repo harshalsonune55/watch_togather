@@ -34,6 +34,7 @@ class WebRTCCall {
     // DOM Elements
     this.localVideo = document.getElementById("localVideo");
     this.remoteVideo = document.getElementById("remoteVideo");
+    this.remoteAudio = document.getElementById("remoteAudio");
     this.localTile = document.getElementById("localTile");
     this.remoteTile = document.getElementById("remoteTile");
 
@@ -376,57 +377,70 @@ class WebRTCCall {
       console.log("WebRTC ontrack received:", event.track.kind, event.track.id);
 
       let stream = (event.streams && event.streams[0]) ? event.streams[0] : null;
-      if (!stream) {
-        stream = new MediaStream([event.track]);
-      }
 
       // Explicit check: is this track screen share?
-      const isScreen = (this.remoteScreenStreamId && stream.id === this.remoteScreenStreamId) ||
+      const isScreen = (this.remoteScreenStreamId && stream && stream.id === this.remoteScreenStreamId) ||
                        (this.remoteScreenStreamId && event.track.id === this.remoteScreenStreamId);
 
       if (isScreen) {
         // Screen Share Track -> MAIN VIDEO THEATER STAGE
-        this.remoteScreenStream = stream;
+        this.remoteScreenStream = stream || new MediaStream([event.track]);
         if (this.screenSharePlayer) {
           this.screenSharePlayer.muted = false;
           this.screenSharePlayer.volume = 1.0;
-          this.screenSharePlayer.srcObject = stream;
+          this.screenSharePlayer.srcObject = this.remoteScreenStream;
           this.screenSharePlayer.play().catch(() => {});
         }
         this.showScreenShareStage(true, this.remoteScreenSharerName || "Friend", false);
       } else {
         // Webcam / Mic Track -> PERSON VIEW TILE
-        if (event.track.kind === "video") {
-          this.remoteCamStream = stream;
-          if (this.remoteVideo) {
-            this.remoteVideo.srcObject = stream;
-            const playPromise = this.remoteVideo.play();
-            if (playPromise !== undefined) {
-              playPromise.catch((err) => {
-                console.warn("remoteVideo.play() prevented by browser autoplay policy:", err);
-                const unlock = () => {
-                  if (this.remoteVideo) this.remoteVideo.play().catch(() => {});
-                };
-                document.addEventListener("click", unlock, { once: true });
-              });
-            }
+        if (!this.remoteCamStream) {
+          this.remoteCamStream = new MediaStream();
+        }
+
+        // Consolidate both video and audio tracks in remoteCamStream
+        if (!this.remoteCamStream.getTracks().some(t => t.id === event.track.id)) {
+          this.remoteCamStream.addTrack(event.track);
+        }
+
+        if (this.remoteVideo) {
+          if (this.remoteVideo.srcObject !== this.remoteCamStream) {
+            this.remoteVideo.srcObject = this.remoteCamStream;
           }
+          // remoteVideo is muted to guarantee 100% autoplay compliance across all browsers
+          this.remoteVideo.muted = true;
+          this.remoteVideo.play().catch((err) => {
+            console.warn("remoteVideo.play() warning:", err);
+          });
+        }
+
+        if (this.remoteAudio) {
+          if (this.remoteAudio.srcObject !== this.remoteCamStream) {
+            this.remoteAudio.srcObject = this.remoteCamStream;
+          }
+          this.remoteAudio.play().catch((err) => {
+            console.warn("remoteAudio autoplay prevented, will unlock on interaction:", err);
+            const unlockAudio = () => {
+              if (this.remoteAudio) this.remoteAudio.play().catch(() => {});
+              document.removeEventListener("click", unlockAudio);
+              document.removeEventListener("touchstart", unlockAudio);
+              document.removeEventListener("keydown", unlockAudio);
+            };
+            document.addEventListener("click", unlockAudio, { once: true });
+            document.addEventListener("touchstart", unlockAudio, { once: true });
+            document.addEventListener("keydown", unlockAudio, { once: true });
+          });
+        }
+
+        if (event.track.kind === "video") {
           this.showRemoteAvatarPlaceholder(false);
           event.track.onunmute = () => {
+            console.log("Remote video track unmuted, revealing video face");
             this.showRemoteAvatarPlaceholder(false);
             if (this.remoteVideo) this.remoteVideo.play().catch(() => {});
           };
         } else if (event.track.kind === "audio") {
-          if (this.remoteVideo && !this.remoteVideo.srcObject) {
-            this.remoteVideo.srcObject = stream;
-            this.remoteVideo.play().catch(() => {});
-          }
-          this.setupAudioMeter(stream, this.remoteTile);
-        } else {
-          if (this.remoteVideo && !this.remoteVideo.srcObject) {
-            this.remoteVideo.srcObject = stream;
-          }
-          this.showRemoteAvatarPlaceholder(false);
+          this.setupAudioMeter(this.remoteCamStream, this.remoteTile);
         }
       }
     };
@@ -439,6 +453,9 @@ class WebRTCCall {
         this.showRemoteAvatarPlaceholder(false);
         if (this.remoteVideo && this.remoteVideo.paused) {
           this.remoteVideo.play().catch(() => {});
+        }
+        if (this.remoteAudio && this.remoteAudio.paused) {
+          this.remoteAudio.play().catch(() => {});
         }
       } else if (state === "disconnected" || state === "failed") {
         console.warn("WebRTC disconnected or failed. Attempting auto-reconnect...");
@@ -466,6 +483,9 @@ class WebRTCCall {
         if (this.remoteVideo && this.remoteVideo.paused) {
           this.remoteVideo.play().catch(() => {});
         }
+        if (this.remoteAudio && this.remoteAudio.paused) {
+          this.remoteAudio.play().catch(() => {});
+        }
       }
     };
 
@@ -492,7 +512,10 @@ class WebRTCCall {
 
       this.socket.emit("signal-offer", {
         targetId,
-        offer: pc.localDescription
+        offer: {
+          type: pc.localDescription.type,
+          sdp: pc.localDescription.sdp
+        }
       });
     } catch (err) {
       console.warn("Error creating offer:", err);
@@ -533,7 +556,10 @@ class WebRTCCall {
 
       this.socket.emit("signal-answer", {
         targetId: senderId,
-        answer: pc.localDescription
+        answer: {
+          type: pc.localDescription.type,
+          sdp: pc.localDescription.sdp
+        }
       });
     } catch (err) {
       console.warn("Error handling offer:", err);
@@ -558,7 +584,7 @@ class WebRTCCall {
         this.peerConnection.remoteDescription &&
         this.peerConnection.remoteDescription.type
       ) {
-        await this.peerConnection.addIceCandidate(candidate);
+        await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
       } else {
         this.pendingCandidates.push(candidate);
       }
@@ -573,7 +599,7 @@ class WebRTCCall {
     this.pendingCandidates = [];
     for (const cand of candidates) {
       try {
-        await this.peerConnection.addIceCandidate(cand);
+        await this.peerConnection.addIceCandidate(new RTCIceCandidate(cand));
       } catch (err) {
         console.warn("Error flushing queued ICE candidate:", err);
       }
@@ -595,6 +621,8 @@ class WebRTCCall {
     this.targetPeerId = user.id;
     this.remotePeerName = user.name;
     this.updateRemoteUserNameUI(user.name);
+    const placeholderText = document.getElementById("remotePlaceholderText");
+    if (placeholderText) placeholderText.textContent = "Connecting video...";
   }
 
   onUserLeft(userId) {
@@ -603,6 +631,8 @@ class WebRTCCall {
       this.showRemoteAvatarPlaceholder(true);
       this.showScreenShareStage(false);
       this.updateRemoteUserNameUI("Waiting for friend...");
+      const placeholderText = document.getElementById("remotePlaceholderText");
+      if (placeholderText) placeholderText.textContent = "Waiting for friend...";
     }
   }
 
@@ -632,6 +662,9 @@ class WebRTCCall {
     }
     if (this.remoteVideo) {
       this.remoteVideo.srcObject = null;
+    }
+    if (this.remoteAudio) {
+      this.remoteAudio.srcObject = null;
     }
     this.remoteCamStream = null;
     this.remoteScreenStream = null;

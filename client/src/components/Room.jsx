@@ -80,6 +80,11 @@ export default function Room({ roomId, initialName, onNavigate }) {
   // Modals & UI Toggles
   const [isCinemaMode, setIsCinemaMode] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [showControls, setShowControls] = useState(true);
+  const [hoverSeekTime, setHoverSeekTime] = useState(null);
+  const [hoverSeekPos, setHoverSeekPos] = useState(0);
+  const [playPulse, setPlayPulse] = useState(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [modalVideoUrl, setModalVideoUrl] = useState('');
@@ -107,6 +112,7 @@ export default function Room({ roomId, initialName, onNavigate }) {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const controlsTimeoutRef = useRef(null);
 
   // Toast Helper
   const showToast = (msg) => {
@@ -842,11 +848,117 @@ export default function Room({ roomId, initialName, onNavigate }) {
     setIsMuted(nextMuted);
     if (html5PlayerRef.current) {
       html5PlayerRef.current.muted = nextMuted;
+      if (!nextMuted && volume > 0) html5PlayerRef.current.volume = volume;
     }
     if (video.type === 'youtube') {
       postToYouTubeIframe(nextMuted ? 'mute' : 'unMute');
+      if (!nextMuted && volume > 0) postToYouTubeIframe('setVolume', [Math.round(volume * 100)]);
     }
   };
+
+  const handleVolumeChange = (newVol) => {
+    setVolume(newVol);
+    if (newVol === 0) {
+      setIsMuted(true);
+      if (html5PlayerRef.current) html5PlayerRef.current.muted = true;
+      if (video.type === 'youtube') postToYouTubeIframe('mute');
+    } else {
+      setIsMuted(false);
+      if (html5PlayerRef.current) {
+        html5PlayerRef.current.muted = false;
+        html5PlayerRef.current.volume = newVol;
+      }
+      if (video.type === 'youtube') {
+        postToYouTubeIframe('unMute');
+        postToYouTubeIframe('setVolume', [Math.round(newVol * 100)]);
+      }
+    }
+  };
+
+  const triggerPlayPulse = (action) => {
+    setPlayPulse(action);
+    setTimeout(() => setPlayPulse(null), 450);
+  };
+
+  const handleStageMouseMove = () => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    if (isPlaying) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 2500);
+    }
+  };
+
+  const handleStageMouseLeave = () => {
+    if (isPlaying) {
+      setShowControls(false);
+    }
+  };
+
+  const handleStageClick = (e) => {
+    if (
+      e.target.closest('.stage-overlay-bottom') ||
+      e.target.closest('.stage-top-actions') ||
+      e.target.closest('.stage-screen-banner') ||
+      e.target.closest('button') ||
+      e.target.closest('input') ||
+      e.target.closest('select')
+    ) {
+      return;
+    }
+    const nextPlay = !isPlaying;
+    triggerPlayPulse(nextPlay ? 'play' : 'pause');
+    handleTogglePlay();
+  };
+
+  const handleScrubberMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    setHoverSeekPos(pos * 100);
+    if (duration > 0) {
+      setHoverSeekTime(pos * duration);
+    }
+  };
+
+  const handleScrubberMouseLeave = () => {
+    setHoverSeekTime(null);
+  };
+
+  // Keyboard controls (Space/K = Play/Pause, F = Fullscreen, M = Mute, Arrows = 5s seek)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) {
+        return;
+      }
+      if (e.code === 'Space' || e.key === 'k' || e.key === 'K') {
+        e.preventDefault();
+        const nextPlay = !isPlaying;
+        triggerPlayPulse(nextPlay ? 'play' : 'pause');
+        handleTogglePlay();
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        handleToggleFullscreen();
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        handleToggleMute();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        const t = Math.min(duration, getLocalPlayerTime() + 5);
+        setCurrentTime(t);
+        seekLocalPlayer(t);
+        socketRef.current?.emit('video-seek', { time: t });
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const t = Math.max(0, getLocalPlayerTime() - 5);
+        setCurrentTime(t);
+        seekLocalPlayer(t);
+        socketRef.current?.emit('video-seek', { time: t });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPlaying, duration, isMuted, volume]);
 
   const handleToggleFullscreen = () => {
     const stageEl = document.getElementById('theaterGrid') || document.querySelector('.huddle-stage-card');
@@ -1190,7 +1302,19 @@ export default function Room({ roomId, initialName, onNavigate }) {
         <div className={`huddle-grid-container ${isCinemaMode ? 'cinema-active' : ''}`} id="theaterGrid">
           
           {/* BIG WINDOW: Main Video Stage */}
-          <div className="huddle-stage-card">
+          <div
+            className="huddle-stage-card"
+            onMouseMove={handleStageMouseMove}
+            onMouseLeave={handleStageMouseLeave}
+            onClick={handleStageClick}
+            onDoubleClick={handleToggleFullscreen}
+          >
+            {/* Play/Pause Center Animation Indicator */}
+            {playPulse && (
+              <div className="center-play-pulse-badge">
+                <i className={`fa-solid ${playPulse === 'play' ? 'fa-play' : 'fa-pause'}`}></i>
+              </div>
+            )}
             
             {/* Screen Share Stage Player (Kept mounted with display toggle so stream attaches with zero latency) */}
             <div
@@ -1312,7 +1436,7 @@ export default function Room({ roomId, initialName, onNavigate }) {
 
             {/* Stage Floating Action Dock - ONLY shown when media is active */}
             {(video.source || stageScreenShare.active || duration > 0) && (
-              <div className="stage-overlay-bottom">
+              <div className={`stage-overlay-bottom ${!showControls && isPlaying ? 'hidden-controls' : ''}`}>
                 <div className="stage-overlay-header-row">
                   <div className="stage-badge-pill" title={video.title}>
                     <i className="fa-solid fa-circle-play" style={{ color: 'var(--mint)' }}></i>
@@ -1322,18 +1446,18 @@ export default function Room({ roomId, initialName, onNavigate }) {
                     <button
                       type="button"
                       className="stage-tool-btn"
-                      onClick={handleToggleMute}
-                      title={isMuted ? 'Unmute Player' : 'Mute Player'}
+                      onClick={handleForceResync}
+                      title="Force Resync with Host"
                     >
-                      <i className={`fa-solid ${isMuted ? 'fa-volume-xmark' : 'fa-volume-high'}`}></i>
+                      <i className="fa-solid fa-arrows-rotate"></i>
                     </button>
                     <button
                       type="button"
                       className="stage-tool-btn"
-                      onClick={handleToggleFullscreen}
-                      title="Fullscreen Theater"
+                      onClick={() => setShowVideoModal(true)}
+                      title="Load Video Link / Direct Stream"
                     >
-                      <i className="fa-solid fa-expand"></i>
+                      <i className="fa-solid fa-link"></i>
                     </button>
                     <button
                       type="button"
@@ -1343,23 +1467,66 @@ export default function Room({ roomId, initialName, onNavigate }) {
                     >
                       <i className="fa-solid fa-arrows-to-eye"></i>
                     </button>
+                    <button
+                      type="button"
+                      className="stage-tool-btn"
+                      onClick={handleToggleFullscreen}
+                      title="Fullscreen Theater"
+                    >
+                      <i className="fa-solid fa-expand"></i>
+                    </button>
                   </div>
                 </div>
 
-                {/* Scrubber Timeline Bar */}
-                <div className="custom-scrubber-row">
+                {/* Scrubber Timeline Bar with Tooltip & Volume Control */}
+                <div
+                  className="custom-scrubber-row"
+                  onMouseMove={handleScrubberMouseMove}
+                  onMouseLeave={handleScrubberMouseLeave}
+                >
                   <button type="button" onClick={handleTogglePlay} className="btn-scrub-play" title={isPlaying ? 'Pause' : 'Play'}>
                     <i className={`fa-solid ${isPlaying ? 'fa-pause' : 'fa-play'}`}></i>
                   </button>
+
                   <div className="scrubber-track" onClick={handleSeek}>
                     <div
                       className="scrubber-fill"
                       style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
-                    ></div>
+                    >
+                      <div className="scrubber-thumb"></div>
+                    </div>
+                    {hoverSeekTime !== null && (
+                      <div className="scrubber-hover-tooltip" style={{ left: `${hoverSeekPos}%` }}>
+                        {formatTime(hoverSeekTime)}
+                      </div>
+                    )}
                   </div>
+
+                  <div className="volume-control-group">
+                    <button
+                      type="button"
+                      className="stage-tool-btn volume-btn"
+                      onClick={handleToggleMute}
+                      title={isMuted || volume === 0 ? 'Unmute Player' : 'Mute Player'}
+                    >
+                      <i className={`fa-solid ${isMuted || volume === 0 ? 'fa-volume-xmark' : volume < 0.5 ? 'fa-volume-low' : 'fa-volume-high'}`}></i>
+                    </button>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={isMuted ? 0 : volume}
+                      onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                      className="volume-slider-bar"
+                      title={`Volume: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
+                    />
+                  </div>
+
                   <div className="scrubber-time-badge">
                     {formatTime(currentTime)} / {formatTime(duration)}
                   </div>
+
                   <select
                     value={playbackRate}
                     onChange={(e) => handleRateChange(parseFloat(e.target.value))}

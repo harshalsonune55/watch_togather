@@ -104,13 +104,13 @@ export default function Home({ onNavigate }) {
       {/* Hero Section */}
       <section className="home-hero-section">
         <div className="home-hero-badge">
-          <span className="badge-glow-dot"></span>
+          <span className="live-dot-green"></span>
           <span>Zero-Drift Synchronization &bull; 2-Way HD Video Call &bull; ✨ Groq AI Assistant</span>
         </div>
 
         <h1 className="home-hero-title">
-          <span className="hero-text-shimmer">Watch Any Video Together.</span><br />
-          <span className="gradient-text hero-text-pulse">
+          <span className="hero-text-solid">Watch Any Video Together.</span><br />
+          <span className="hero-text-accent">
             <Typewriter speed="normal" variance="natural">In Total Real-Time Sync.</Typewriter>
           </span>
         </h1>

@@ -5,47 +5,47 @@
    ========================================================================== */
 
 :root {
-  /* Surfaces & Backgrounds */
-  --bg-app: #0c0d11;
-  --bg-sidebar: #101217;
-  --bg-surface: #14161e;
-  --bg-card: #181b24;
-  --bg-card-hover: #1f2330;
-  --bg-dock: #171922;
-  --bg-glass: rgba(18, 20, 27, 0.82);
+  /* Surfaces & Backgrounds - Dark Jet Black Theme */
+  --bg-app: #000000;
+  --bg-sidebar: #09090b;
+  --bg-surface: #0a0a0c;
+  --bg-card: #0d0e12;
+  --bg-card-hover: #121318;
+  --bg-dock: #07080a;
+  --bg-glass: rgba(10, 10, 12, 0.88);
 
   /* Borders */
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-card: rgba(255, 255, 255, 0.09);
-  --border-hover: rgba(255, 255, 255, 0.16);
-  --border-focus: rgba(34, 197, 94, 0.5);
+  --border-subtle: #1f2228;
+  --border-card: #1c1f24;
+  --border-hover: #10b981;
+  --border-focus: #10b981;
 
   /* Accents */
-  --mint: #22c55e;
-  --mint-light: #4ade80;
-  --mint-glow: rgba(34, 197, 94, 0.35);
-  --mint-soft: rgba(34, 197, 94, 0.12);
+  --mint: #10b981;
+  --mint-light: #34d399;
+  --mint-glow: transparent;
+  --mint-soft: rgba(16, 185, 129, 0.12);
   --blue-action: #2563eb;
-  --blue-glow: rgba(37, 99, 235, 0.35);
+  --blue-glow: transparent;
   --danger: #ef4444;
   --danger-hover: #dc2626;
 
   /* Pastel Badges (from Virtual Huddle UI) */
-  --pastel-peach-bg: #fed7aa;
-  --pastel-peach-text: #7c2d12;
-  --pastel-mint-bg: #bbf7d0;
-  --pastel-mint-text: #14532d;
-  --pastel-lavender-bg: #ddd6fe;
-  --pastel-lavender-text: #4c1d95;
-  --pastel-coral-bg: #fecdd3;
-  --pastel-coral-text: #881337;
-  --pastel-cyan-bg: #cffafe;
-  --pastel-cyan-text: #155e75;
+  --pastel-peach-bg: #2d1808;
+  --pastel-peach-text: #fdba74;
+  --pastel-mint-bg: #064e3b;
+  --pastel-mint-text: #6ee7b7;
+  --pastel-lavender-bg: #2e1065;
+  --pastel-lavender-text: #c4b5fd;
+  --pastel-coral-bg: #4c0519;
+  --pastel-coral-text: #fda4af;
+  --pastel-cyan-bg: #082f49;
+  --pastel-cyan-text: #7dd3fc;
 
   /* Typography Colors */
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --text-main: #ffffff;
+  --text-muted: #9ca3af;
+  --text-dim: #6b7280;
 
   /* Radii */
   --radius-sm: 8px;
@@ -55,10 +55,10 @@
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 16px 45px rgba(0, 0, 0, 0.6);
-  --shadow-mint: 0 0 25px var(--mint-glow);
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 16px 45px rgba(0, 0, 0, 0.7);
+  --shadow-mint: none;
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -197,12 +197,12 @@ body {
   border: none;
   cursor: pointer;
   transition: var(--transition);
-  box-shadow: 0 4px 15px var(--mint-glow);
+  box-shadow: none;
 }
 .btn-mint-pill:hover {
   background: var(--mint-light);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px var(--mint-glow);
+  box-shadow: none;
 }
 
 /* Landing Hero Section */
@@ -442,15 +442,8 @@ body {
   overflow: hidden;
 }
 
-/* Subtle glowing abstract shape */
 .bento-ambient-glow {
-  position: absolute;
-  top: -60px;
-  right: -60px;
-  width: 280px;
-  height: 280px;
-  background: radial-gradient(circle, rgba(34, 197, 94, 0.25), transparent 70%);
-  pointer-events: none;
+  display: none;
 }
 
 .bento-form-title {
@@ -588,7 +581,7 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 1.1rem;
-  box-shadow: 0 0 16px var(--mint-glow);
+  box-shadow: none;
   flex-shrink: 0;
 }
 
@@ -913,7 +906,7 @@ body {
   font-size: 1.8rem;
   cursor: pointer;
   z-index: 30;
-  box-shadow: 0 0 30px var(--mint-glow);
+  box-shadow: none;
   transition: var(--transition);
 }
 
@@ -1139,7 +1132,7 @@ body {
   justify-content: center;
   gap: 3px;
   z-index: 20;
-  box-shadow: 0 0 10px var(--blue-glow);
+  box-shadow: none;
   transition: all 0.25s ease;
 }
 
@@ -1155,12 +1148,12 @@ body {
 /* On Speaking: Three-dot symbol moves in smooth animated wave! */
 .huddle-video-card.speaking {
   border-color: var(--mint) !important;
-  box-shadow: 0 0 20px var(--mint-glow) !important;
+  box-shadow: 0 0 0 2px var(--mint) !important;
 }
 
 .huddle-video-card.speaking .card-dots-badge {
   background: var(--mint) !important;
-  box-shadow: 0 0 16px var(--mint-glow) !important;
+  box-shadow: none !important;
 }
 
 .huddle-video-card.speaking .speaking-dot {
@@ -1430,7 +1423,7 @@ body {
   cursor: pointer;
   z-index: 20;
   transition: var(--transition);
-  box-shadow: 0 0 10px var(--blue-glow);
+  box-shadow: none;
 }
 .card-options-btn:hover {
   transform: scale(1.1);
@@ -1551,8 +1544,8 @@ body {
 .dock-circle-btn.active-mint {
   background: var(--mint);
   border-color: var(--mint);
-  color: #0c0d11;
-  box-shadow: 0 0 15px var(--mint-glow);
+  color: #000000;
+  box-shadow: none;
 }
 
 /* Red End Call Pill/Circle Button (from Virtual Huddle) */

@@ -86,6 +86,32 @@ function parseVideoSource(input) {
   };
 }
 
+// Helper: Fetch YouTube Title & Description for AI Context
+async function fetchYouTubeMetadata(videoId) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+      },
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const html = await res.text();
+    const descMatch = html.match(/<meta\s+name="description"\s+content="([^"]*)"/i) || html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i);
+    const titleMatch = html.match(/<meta\s+name="title"\s+content="([^"]*)"/i) || html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i);
+    return {
+      title: titleMatch ? titleMatch[1].replace(/ - YouTube$/i, "").trim() : null,
+      description: descMatch ? descMatch[1].trim() : null
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 // In-Memory Room State Store
 const rooms = new Map();
 
@@ -99,6 +125,7 @@ function getOrCreateRoom(roomId) {
         type: null,
         source: null,
         title: "Waiting for video link or screen share",
+        description: "",
         state: "paused", // 'playing' | 'paused'
         currentTime: 0,
         lastUpdated: Date.now(),
@@ -150,14 +177,19 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(methodOverride("_method"));
 
-// AI Co-Pilot Assistant API (Groq LLaMA 3.3)
+// AI Co-Pilot Assistant API (Groq LLaMA / Qwen / GPT-OSS)
 app.post("/api/ai/catch-up", async (req, res) => {
-  const { roomId, currentTime, videoTitle, recentMessages, prompt } = req.body || {};
+  const { roomId, currentTime, videoTitle, videoDescription, recentMessages, prompt } = req.body || {};
   const apiKey = process.env.GROQ_API_KEY;
+
+  const room = roomId ? rooms.get(roomId.toLowerCase().trim()) : null;
+  const effectiveTitle = videoTitle || room?.video?.title || "Live Video";
+  const effectiveDescription = videoDescription || room?.video?.description || "";
+  const effectiveTime = currentTime || (room ? `${Math.floor(getRoomCurrentTime(room) / 60)}:${String(Math.floor(getRoomCurrentTime(room) % 60)).padStart(2, "0")}` : "00:00");
 
   if (!apiKey) {
     return res.json({
-      summary: `🍿 **Watchooo AI Co-Pilot**:\n• You are currently watching **${videoTitle || 'the video'}** at **${currentTime || '00:00'}**!\n• To activate real-time LLaMA 3.3 intelligent summaries for latecomers, add \`GROQ_API_KEY=...\` to your \`.env\` file.`
+      summary: `🍿 **Watchooo AI Co-Pilot**:\n• You are currently watching **${effectiveTitle}** at **${effectiveTime}**!\n${effectiveDescription ? `• *Synopsis*: ${effectiveDescription.slice(0, 140)}...\n` : ''}• To activate real-time intelligent summaries for latecomers, add \`GROQ_API_KEY=...\` to your \`.env\` file.`
     });
   }
 
@@ -166,10 +198,11 @@ app.post("/api/ai/catch-up", async (req, res) => {
       .map(m => `${m.sender}: ${m.text}`)
       .join("\n") || "No chat messages yet.";
 
-    const systemPrompt = `You are Watchooo AI, a friendly, hyper-concise co-pilot for a synchronized video watch party. The user joined the room late or asked for an update. Provide a crisp 2-3 bullet point summary catching them up on what's happening right now in the video and what friends in the room are saying. Keep it engaging, fun, and brief (under 80 words).`;
+    const systemPrompt = `You are Watchooo AI, a friendly, hyper-concise co-pilot for a synchronized video watch party. The user joined the room late or asked for an update. Using the video title, video description/synopsis, current video timestamp, and recent room chat, provide a crisp 2-3 bullet point summary catching them up on what's happening right now in the video and what friends in the room are saying. Keep it engaging, fun, and brief (under 85 words).`;
 
-    const userContent = `Video: ${videoTitle || 'Live Video'}
-Current Timestamp: ${currentTime || '00:00'}
+    const userContent = `Video Title: ${effectiveTitle}
+Video Description / Synopsis: ${effectiveDescription || 'No description provided.'}
+Current Timestamp: ${effectiveTime}
 Recent Room Chat:
 ${formattedChat}
 User Request: ${prompt || 'What did I miss?'}`;
@@ -207,7 +240,7 @@ User Request: ${prompt || 'What did I miss?'}`;
             { role: "user", content: userContent }
           ],
           temperature: 0.6,
-          max_tokens: 600
+          max_tokens: 300
         })
       });
     }
@@ -216,17 +249,17 @@ User Request: ${prompt || 'What did I miss?'}`;
       const errText = await response.text();
       console.warn("Groq API error response:", errText);
       return res.json({
-        summary: `🍿 You're watching **${videoTitle || 'the video'}** at **${currentTime || '00:00'}**. Chat is active, jump right in!`
+        summary: `🍿 You're watching **${effectiveTitle}** at **${effectiveTime}**! ${effectiveDescription ? effectiveDescription.slice(0, 110) + '...' : 'Chat is active, jump right in!'}`
       });
     }
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || `🍿 Catching you up: watching **${videoTitle}** at **${currentTime}**!`;
+    const reply = data.choices?.[0]?.message?.content || `🍿 Catching you up: watching **${effectiveTitle}** at **${effectiveTime}**!`;
     return res.json({ summary: reply });
   } catch (err) {
     console.error("AI Catch-Up exception:", err);
     return res.json({
-      summary: `🍿 You're watching **${videoTitle || 'the video'}** at **${currentTime || '00:00'}**! Have fun watching together!`
+      summary: `🍿 You're watching **${effectiveTitle}** at **${effectiveTime}**! Have fun watching together!`
     });
   }
 });
@@ -346,6 +379,7 @@ io.on("connection", (socket) => {
         type: room.video.type,
         source: room.video.source,
         title: room.video.title,
+        description: room.video.description || "",
         state: room.video.state,
         currentTime: getRoomCurrentTime(room),
         playbackRate: room.video.playbackRate,
@@ -458,15 +492,35 @@ io.on("connection", (socket) => {
     room.video.type = parsed.type;
     room.video.source = parsed.source;
     room.video.title = payload.title || parsed.title;
+    room.video.description = payload.description || "";
     room.video.currentTime = 0;
     room.video.state = "paused";
     room.video.lastUpdated = Date.now();
+
+    // If YouTube video, asynchronously fetch title and description for richer AI context
+    if (parsed.type === "youtube") {
+      fetchYouTubeMetadata(parsed.source).then((meta) => {
+        if (meta) {
+          if (meta.title && (room.video.title.startsWith("YouTube Video") || !room.video.title)) {
+            room.video.title = meta.title;
+          }
+          if (meta.description) {
+            room.video.description = meta.description;
+          }
+          io.to(currentRoomId).emit("video-metadata-update", {
+            title: room.video.title,
+            description: room.video.description
+          });
+        }
+      });
+    }
 
     io.to(currentRoomId).emit("video-change", {
       video: {
         type: room.video.type,
         source: room.video.source,
         title: room.video.title,
+        description: room.video.description,
         state: room.video.state,
         currentTime: 0,
         playbackRate: room.video.playbackRate,

@@ -35,6 +35,7 @@ export default function Room({ roomId, initialName, onNavigate }) {
     type: null,
     source: null,
     title: 'Waiting for video link or screen share',
+    description: '',
     state: 'paused',
     currentTime: 0,
     playbackRate: 1.0
@@ -108,6 +109,10 @@ export default function Room({ roomId, initialName, onNavigate }) {
   const html5PlayerRef = useRef(null);
   const ytPlayerRef = useRef(null);
   const ytIframeRef = useRef(null);
+  const ytPlayerInstanceRef = useRef(null);
+  const ytContainerRef = useRef(null);
+  const isRemoteActionRef = useRef(false);
+  const lastReportedTimeRef = useRef(0);
   const stageScreenShareRef = useRef(stageScreenShare);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -161,9 +166,14 @@ export default function Room({ roomId, initialName, onNavigate }) {
       }
 
       if (data.video) {
-        setVideo(data.video);
+        setVideo((prev) => ({
+          ...prev,
+          ...data.video,
+          description: data.video.description || prev.description || ''
+        }));
         if (data.video.currentTime > 0) {
           setCurrentTime(data.video.currentTime);
+          lastReportedTimeRef.current = data.video.currentTime;
         }
         setIsPlaying(data.video.state === 'playing');
 
@@ -214,35 +224,63 @@ export default function Room({ roomId, initialName, onNavigate }) {
     // 6. Video Sync Broadcasts
     socket.on('video-change', (data) => {
       if (data.video) {
-        setVideo(data.video);
+        setVideo((prev) => ({
+          ...prev,
+          ...data.video,
+          description: data.video.description || prev.description || ''
+        }));
         setCurrentTime(0);
+        lastReportedTimeRef.current = 0;
         setIsPlaying(false);
         showToast(`🎬 Loaded: ${data.video.title}`);
       }
     });
 
+    socket.on('video-metadata-update', ({ title, description }) => {
+      setVideo((prev) => ({
+        ...prev,
+        title: title || prev.title,
+        description: description !== undefined ? description : prev.description
+      }));
+    });
+
     socket.on('video-play', (data) => {
       setIsPlaying(true);
+      isRemoteActionRef.current = true;
       if (typeof data.time === 'number') {
         setCurrentTime(data.time);
         seekLocalPlayer(data.time);
+        lastReportedTimeRef.current = data.time;
       }
       playLocalPlayer();
+      setTimeout(() => {
+        isRemoteActionRef.current = false;
+      }, 600);
     });
 
     socket.on('video-pause', (data) => {
       setIsPlaying(false);
+      isRemoteActionRef.current = true;
       if (typeof data.time === 'number') {
         setCurrentTime(data.time);
         seekLocalPlayer(data.time);
+        lastReportedTimeRef.current = data.time;
       }
       pauseLocalPlayer();
+      setTimeout(() => {
+        isRemoteActionRef.current = false;
+      }, 600);
     });
 
     socket.on('video-seek', (data) => {
       if (typeof data.time === 'number') {
+        isRemoteActionRef.current = true;
         setCurrentTime(data.time);
         seekLocalPlayer(data.time);
+        lastReportedTimeRef.current = data.time;
+        setTimeout(() => {
+          isRemoteActionRef.current = false;
+        }, 600);
       }
     });
 
@@ -257,7 +295,13 @@ export default function Room({ roomId, initialName, onNavigate }) {
       if (data.state === 'playing') {
         const localT = getLocalPlayerTime();
         if (Math.abs(localT - data.currentTime) > 1.8) {
+          isRemoteActionRef.current = true;
           seekLocalPlayer(data.currentTime);
+          setCurrentTime(data.currentTime);
+          lastReportedTimeRef.current = data.currentTime;
+          setTimeout(() => {
+            isRemoteActionRef.current = false;
+          }, 600);
         }
       }
     });
@@ -746,9 +790,214 @@ export default function Room({ roomId, initialName, onNavigate }) {
   };
 
   // --------------------------------------------------------------------------
+  // YouTube IFrame API Script Loader & Player Lifecycle
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!window.YT) {
+      const existing = document.getElementById('yt-iframe-api-script');
+      if (!existing) {
+        const tag = document.createElement('script');
+        tag.id = 'yt-iframe-api-script';
+        tag.src = 'https://www.youtube.com/iframe_api';
+        const firstScript = document.getElementsByTagName('script')[0];
+        if (firstScript && firstScript.parentNode) {
+          firstScript.parentNode.insertBefore(tag, firstScript);
+        } else {
+          document.head.appendChild(tag);
+        }
+      }
+    }
+  }, []);
+
+  // Initialize YouTube IFrame Player Instance
+  useEffect(() => {
+    if (video.type !== 'youtube' || !video.source) {
+      if (ytPlayerInstanceRef.current?.destroy) {
+        try {
+          ytPlayerInstanceRef.current.destroy();
+        } catch (e) {}
+        ytPlayerInstanceRef.current = null;
+      }
+      return;
+    }
+
+    let isSubscribed = true;
+    let pollTimer = null;
+
+    const initPlayer = () => {
+      if (!isSubscribed) return;
+      if (!window.YT || !window.YT.Player) return;
+
+      const container = ytContainerRef.current;
+      if (!container) return;
+
+      // Cleanly replace target DOM node inside container
+      container.innerHTML = '<div id="ytStagePlayer" style="width:100%;height:100%;"></div>';
+
+      try {
+        if (ytPlayerInstanceRef.current?.destroy) {
+          try {
+            ytPlayerInstanceRef.current.destroy();
+          } catch (e) {}
+          ytPlayerInstanceRef.current = null;
+        }
+
+        ytPlayerInstanceRef.current = new window.YT.Player('ytStagePlayer', {
+          width: '100%',
+          height: '100%',
+          videoId: video.source,
+          playerVars: {
+            autoplay: isPlaying ? 1 : 0,
+            start: Math.floor(video.currentTime || 0),
+            playsinline: 1,
+            rel: 0,
+            modestbranding: 1,
+            controls: 1,
+            enablejsapi: 1,
+            origin: window.location.origin
+          },
+          events: {
+            onReady: (event) => {
+              if (!isSubscribed) return;
+              const player = event.target;
+              try {
+                const dur = player.getDuration();
+                if (dur > 0) setDuration(dur);
+
+                if (video.currentTime > 0) {
+                  player.seekTo(video.currentTime, true);
+                }
+
+                if (isPlaying) {
+                  player.playVideo();
+                } else {
+                  player.pauseVideo();
+                }
+
+                if (isMuted || volume === 0) {
+                  player.mute();
+                } else {
+                  player.unMute();
+                  player.setVolume(Math.round(volume * 100));
+                }
+
+                if (playbackRate && playbackRate !== 1) {
+                  player.setPlaybackRate(playbackRate);
+                }
+
+                const d = player.getVideoData();
+                if (d && d.title) {
+                  setVideo((prev) => ({
+                    ...prev,
+                    title: prev.title.startsWith('YouTube Video') ? d.title : prev.title
+                  }));
+                }
+              } catch (e) {}
+            },
+            onStateChange: (event) => {
+              if (!isSubscribed) return;
+              const player = event.target;
+              try {
+                const cur = player.getCurrentTime() || 0;
+                const dur = player.getDuration() || 0;
+                if (dur > 0) setDuration(dur);
+                setCurrentTime(cur);
+                lastReportedTimeRef.current = cur;
+
+                if (isRemoteActionRef.current) {
+                  if (event.data === 1) setIsPlaying(true);
+                  else if (event.data === 2) setIsPlaying(false);
+                  return;
+                }
+
+                // Local user triggered playback change directly in player
+                if (event.data === 1) { // PLAYING
+                  setIsPlaying(true);
+                  socketRef.current?.emit('video-play', { time: cur });
+                } else if (event.data === 2) { // PAUSED
+                  setIsPlaying(false);
+                  socketRef.current?.emit('video-pause', { time: cur });
+                }
+              } catch (e) {}
+            }
+          }
+        });
+      } catch (err) {
+        console.warn('Failed to initialize YouTube player:', err);
+      }
+    };
+
+    if (window.YT && window.YT.Player) {
+      initPlayer();
+    } else {
+      let tries = 0;
+      pollTimer = setInterval(() => {
+        tries++;
+        if (window.YT && window.YT.Player) {
+          clearInterval(pollTimer);
+          initPlayer();
+        } else if (tries > 60) {
+          clearInterval(pollTimer);
+        }
+      }, 100);
+    }
+
+    return () => {
+      isSubscribed = false;
+      if (pollTimer) clearInterval(pollTimer);
+      if (ytPlayerInstanceRef.current?.destroy) {
+        try {
+          ytPlayerInstanceRef.current.destroy();
+        } catch (e) {}
+        ytPlayerInstanceRef.current = null;
+      }
+    };
+  }, [video.type, video.source]);
+
+  // Continuous Timeline Polling for YouTube (keeps progress bar & time badge smoothly advancing)
+  useEffect(() => {
+    if (video.type !== 'youtube' || !video.source) return;
+
+    const timer = setInterval(() => {
+      const player = ytPlayerInstanceRef.current;
+      if (!player || typeof player.getCurrentTime !== 'function') return;
+
+      try {
+        const cur = player.getCurrentTime() || 0;
+        const dur = player.getDuration() || 0;
+
+        if (dur > 0) {
+          setDuration((prev) => (Math.abs(prev - dur) > 0.5 ? dur : prev));
+        }
+        setCurrentTime(cur);
+
+        // Detect user seeking natively inside YouTube player scrubber:
+        if (!isRemoteActionRef.current && isPlaying) {
+          const diff = cur - lastReportedTimeRef.current;
+          // In 250ms interval, normal playback advances ~0.25s.
+          // If difference is backward or forward by > 1.8s, the user seeked inside the iframe!
+          if (diff < -1.0 || diff > 1.8) {
+            socketRef.current?.emit('video-seek', { time: cur });
+          }
+        }
+        lastReportedTimeRef.current = cur;
+      } catch (e) {}
+    }, 250);
+
+    return () => clearInterval(timer);
+  }, [video.type, video.source, isPlaying]);
+
+  // --------------------------------------------------------------------------
   // Synchronized Player Helpers
   // --------------------------------------------------------------------------
   const postToYouTubeIframe = (func, args = []) => {
+    if (ytPlayerInstanceRef.current && typeof ytPlayerInstanceRef.current[func] === 'function') {
+      try {
+        ytPlayerInstanceRef.current[func](...(args || []));
+        return;
+      } catch (e) {}
+    }
     if (ytIframeRef.current && ytIframeRef.current.contentWindow) {
       try {
         ytIframeRef.current.contentWindow.postMessage(
@@ -768,7 +1017,11 @@ export default function Room({ roomId, initialName, onNavigate }) {
           html5PlayerRef.current.play().catch(() => {});
         }
       });
-    } else if (video.type === 'youtube') {
+    } else if (video.type === 'youtube' && ytPlayerInstanceRef.current?.playVideo) {
+      try {
+        ytPlayerInstanceRef.current.playVideo();
+      } catch (e) {}
+    } else {
       postToYouTubeIframe('playVideo');
     }
   };
@@ -776,7 +1029,11 @@ export default function Room({ roomId, initialName, onNavigate }) {
   const pauseLocalPlayer = () => {
     if (video.type === 'html5' && html5PlayerRef.current) {
       html5PlayerRef.current.pause();
-    } else if (video.type === 'youtube') {
+    } else if (video.type === 'youtube' && ytPlayerInstanceRef.current?.pauseVideo) {
+      try {
+        ytPlayerInstanceRef.current.pauseVideo();
+      } catch (e) {}
+    } else {
       postToYouTubeIframe('pauseVideo');
     }
   };
@@ -784,7 +1041,11 @@ export default function Room({ roomId, initialName, onNavigate }) {
   const seekLocalPlayer = (time) => {
     if (video.type === 'html5' && html5PlayerRef.current) {
       html5PlayerRef.current.currentTime = time;
-    } else if (video.type === 'youtube') {
+    } else if (video.type === 'youtube' && ytPlayerInstanceRef.current?.seekTo) {
+      try {
+        ytPlayerInstanceRef.current.seekTo(time, true);
+      } catch (e) {}
+    } else {
       postToYouTubeIframe('seekTo', [time, true]);
     }
   };
@@ -792,7 +1053,11 @@ export default function Room({ roomId, initialName, onNavigate }) {
   const setPlayerRate = (rate) => {
     if (video.type === 'html5' && html5PlayerRef.current) {
       html5PlayerRef.current.playbackRate = rate;
-    } else if (video.type === 'youtube') {
+    } else if (video.type === 'youtube' && ytPlayerInstanceRef.current?.setPlaybackRate) {
+      try {
+        ytPlayerInstanceRef.current.setPlaybackRate(rate);
+      } catch (e) {}
+    } else {
       postToYouTubeIframe('setPlaybackRate', [rate]);
     }
   };
@@ -800,6 +1065,11 @@ export default function Room({ roomId, initialName, onNavigate }) {
   const getLocalPlayerTime = () => {
     if (video.type === 'html5' && html5PlayerRef.current) {
       return html5PlayerRef.current.currentTime;
+    }
+    if (video.type === 'youtube' && ytPlayerInstanceRef.current?.getCurrentTime) {
+      try {
+        return ytPlayerInstanceRef.current.getCurrentTime() || currentTime;
+      } catch (e) {}
     }
     return currentTime;
   };
@@ -809,6 +1079,7 @@ export default function Room({ roomId, initialName, onNavigate }) {
     setIsPlaying(nextPlay);
     const t = getLocalPlayerTime();
 
+    isRemoteActionRef.current = true;
     if (nextPlay) {
       playLocalPlayer();
       socketRef.current?.emit('video-play', { time: t });
@@ -816,16 +1087,24 @@ export default function Room({ roomId, initialName, onNavigate }) {
       pauseLocalPlayer();
       socketRef.current?.emit('video-pause', { time: t });
     }
+    setTimeout(() => {
+      isRemoteActionRef.current = false;
+    }, 600);
   };
 
   const handleSeek = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const pos = (e.clientX - rect.left) / rect.width;
+    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     if (duration > 0) {
       const targetTime = Math.max(0, pos * duration);
+      isRemoteActionRef.current = true;
       setCurrentTime(targetTime);
       seekLocalPlayer(targetTime);
+      lastReportedTimeRef.current = targetTime;
       socketRef.current?.emit('video-seek', { time: targetTime });
+      setTimeout(() => {
+        isRemoteActionRef.current = false;
+      }, 600);
     }
   };
 
@@ -851,8 +1130,19 @@ export default function Room({ roomId, initialName, onNavigate }) {
       if (!nextMuted && volume > 0) html5PlayerRef.current.volume = volume;
     }
     if (video.type === 'youtube') {
-      postToYouTubeIframe(nextMuted ? 'mute' : 'unMute');
-      if (!nextMuted && volume > 0) postToYouTubeIframe('setVolume', [Math.round(volume * 100)]);
+      if (ytPlayerInstanceRef.current) {
+        try {
+          if (nextMuted) {
+            ytPlayerInstanceRef.current.mute();
+          } else {
+            ytPlayerInstanceRef.current.unMute();
+            if (volume > 0) ytPlayerInstanceRef.current.setVolume(Math.round(volume * 100));
+          }
+        } catch (e) {}
+      } else {
+        postToYouTubeIframe(nextMuted ? 'mute' : 'unMute');
+        if (!nextMuted && volume > 0) postToYouTubeIframe('setVolume', [Math.round(volume * 100)]);
+      }
     }
   };
 
@@ -861,7 +1151,13 @@ export default function Room({ roomId, initialName, onNavigate }) {
     if (newVol === 0) {
       setIsMuted(true);
       if (html5PlayerRef.current) html5PlayerRef.current.muted = true;
-      if (video.type === 'youtube') postToYouTubeIframe('mute');
+      if (video.type === 'youtube') {
+        if (ytPlayerInstanceRef.current?.mute) {
+          try { ytPlayerInstanceRef.current.mute(); } catch (e) {}
+        } else {
+          postToYouTubeIframe('mute');
+        }
+      }
     } else {
       setIsMuted(false);
       if (html5PlayerRef.current) {
@@ -869,8 +1165,15 @@ export default function Room({ roomId, initialName, onNavigate }) {
         html5PlayerRef.current.volume = newVol;
       }
       if (video.type === 'youtube') {
-        postToYouTubeIframe('unMute');
-        postToYouTubeIframe('setVolume', [Math.round(newVol * 100)]);
+        if (ytPlayerInstanceRef.current?.unMute) {
+          try {
+            ytPlayerInstanceRef.current.unMute();
+            ytPlayerInstanceRef.current.setVolume(Math.round(newVol * 100));
+          } catch (e) {}
+        } else {
+          postToYouTubeIframe('unMute');
+          postToYouTubeIframe('setVolume', [Math.round(newVol * 100)]);
+        }
       }
     }
   };
@@ -1087,6 +1390,7 @@ export default function Room({ roomId, initialName, onNavigate }) {
           roomId,
           currentTime: formatTime(currentTime),
           videoTitle: video.title,
+          videoDescription: video.description || '',
           recentMessages: messages.slice(-15),
           prompt: userPrompt
         })
@@ -1362,16 +1666,14 @@ export default function Room({ roomId, initialName, onNavigate }) {
             {!stageScreenShare.active && video.source ? (
               <div className="video-player-wrapper" style={{ width: '100%', height: '100%', position: 'relative' }}>
                 {video.type === 'youtube' ? (
-                  <iframe
-                    ref={ytIframeRef}
-                    id="ytStagePlayer"
-                    className="youtube-embed-player"
-                    src={`https://www.youtube-nocookie.com/embed/${video.source}?enablejsapi=1&autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
-                    title="YouTube video player"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                    style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-                  ></iframe>
+                  <div
+                    ref={ytContainerRef}
+                    key={video.source}
+                    className="youtube-embed-player-wrapper"
+                    style={{ width: '100%', height: '100%', position: 'relative', background: '#000000', overflow: 'hidden' }}
+                  >
+                    <div id="ytStagePlayer" style={{ width: '100%', height: '100%' }}></div>
+                  </div>
                 ) : (
                   <video
                     ref={html5PlayerRef}
@@ -1416,6 +1718,25 @@ export default function Room({ roomId, initialName, onNavigate }) {
                 </div>
                 <div className="empty-state-samples">
                   <span className="samples-label">Quick Test Streams:</span>
+                  <button
+                    type="button"
+                    className="sample-chip"
+                    onClick={() => {
+                      socketRef.current?.emit('video-change', { source: 'https://www.youtube.com/watch?v=oc_o5DZM3qc' });
+                      setVideo({
+                        type: 'youtube',
+                        source: 'oc_o5DZM3qc',
+                        title: 'India Nature 4K',
+                        description: '',
+                        state: 'paused',
+                        currentTime: 0,
+                        playbackRate: 1.0
+                      });
+                      showToast('🎬 Loaded: India Nature 4K');
+                    }}
+                  >
+                    🇮🇳 YouTube: India Nature 4K
+                  </button>
                   <button
                     type="button"
                     className="sample-chip"

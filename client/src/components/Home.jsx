@@ -42,13 +42,36 @@ export default function Home({ onNavigate }) {
 
   // Active YouTube Demo Preview (Plays continuously without audio)
   const [activeYoutubeVideo, setActiveYoutubeVideo] = useState('oc_o5DZM3qc');
-  const [typewriterCycle, setTypewriterCycle] = useState(0);
+  
+  // Continuous forward-type -> pause -> reverse-erase -> pause -> forward-type animation loop
+  const FULL_HERO_TEXT = 'In Total Real-Time Sync.';
+  const [typewriterText, setTypewriterText] = useState(FULL_HERO_TEXT);
+  const isErasingRef = useRef(false);
+  const typewriterTimeoutRef = useRef(null);
 
   const handleTypewriterDone = () => {
-    setTimeout(() => {
-      setTypewriterCycle((prev) => prev + 1);
-    }, 1800);
+    if (typewriterTimeoutRef.current) clearTimeout(typewriterTimeoutRef.current);
+
+    if (!isErasingRef.current) {
+      // Finished typing forward: pause so user can read, then erase backwards (reverse)
+      typewriterTimeoutRef.current = setTimeout(() => {
+        isErasingRef.current = true;
+        setTypewriterText('');
+      }, 1800);
+    } else {
+      // Finished erasing backwards: brief pause, then type forward again
+      typewriterTimeoutRef.current = setTimeout(() => {
+        isErasingRef.current = false;
+        setTypewriterText(FULL_HERO_TEXT);
+      }, 500);
+    }
   };
+
+  useEffect(() => {
+    return () => {
+      if (typewriterTimeoutRef.current) clearTimeout(typewriterTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('wt_username', displayName);
@@ -118,14 +141,16 @@ export default function Home({ onNavigate }) {
 
         <h1 className="home-hero-title">
           <span className="hero-text-solid">Watch Any Video Together.</span><br />
-          <span className="hero-text-accent">
+          <span className="hero-text-accent" style={{ display: 'inline-block', minHeight: '1.2em' }}>
             <Typewriter
-              key={typewriterCycle}
               speed="normal"
               variance="natural"
+              replace="type"
+              backspace="character"
+              backspaceFactor={0.4}
               onComplete={handleTypewriterDone}
             >
-              In Total Real-Time Sync.
+              {typewriterText}
             </Typewriter>
           </span>
         </h1>

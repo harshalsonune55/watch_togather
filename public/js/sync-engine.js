@@ -418,12 +418,13 @@ class SyncEngine {
   }
 
   togglePlay() {
+    // Only trigger the local play/pause. The native onplay/onpause handlers
+    // emit the single "video-play"/"video-pause" event to peers, so we avoid
+    // emitting twice here (which used to cause a stutter on the friend's side).
     if (this.isPlaying) {
       this.pauseLocal();
-      this.socket.emit("video-pause", { time: this.getCurrentTime() });
     } else {
       this.playLocal();
-      this.socket.emit("video-play", { time: this.getCurrentTime() });
     }
   }
 

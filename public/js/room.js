@@ -176,6 +176,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Update the speed dropdown when the friend changes the playback rate
+  socket.on("video-rate", (data) => {
+    if (!speedSelect || typeof data.rate !== "number") return;
+    const opts = Array.from(speedSelect.options);
+    const match = opts.find((o) => Math.abs(parseFloat(o.value) - data.rate) < 0.001);
+    if (match) speedSelect.value = match.value;
+  });
+
   // Resync Button
   const handleResync = () => {
     syncEngine.requestForceResync();

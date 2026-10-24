@@ -140,7 +140,10 @@ export default function Room({ roomId, initialName, onNavigate }) {
   // Socket.IO & WebRTC Initialization
   // --------------------------------------------------------------------------
   useEffect(() => {
-    const socket = io();
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling']
+    });
     socketRef.current = socket;
 
     // Check if user came from lobby with a pending video link
@@ -211,7 +214,15 @@ export default function Room({ roomId, initialName, onNavigate }) {
 
     // 5. Chat & Reactions
     socket.on('chat-message', (msg) => {
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => {
+        if (msg.id && prev.some((m) => m.id === msg.id)) {
+          return prev;
+        }
+        if (msg.sender === userName && prev.some((m) => m.sender === userName && m.text === msg.text && m.isSelf)) {
+          return prev;
+        }
+        return [...prev, msg];
+      });
     });
 
     socket.on('chat-typing', ({ sender, isTyping }) => {
@@ -1349,13 +1360,24 @@ export default function Room({ roomId, initialName, onNavigate }) {
     const text = chatInput.trim();
     setChatInput('');
 
+    const localMsgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+    const localMsg = {
+      id: localMsgId,
+      sender: userName,
+      text: text,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isSelf: true
+    };
+    // Optimistically show message immediately
+    setMessages((prev) => [...prev, localMsg]);
+
     // Check if user is asking the AI directly via @ai
     if (text.toLowerCase().startsWith('@ai')) {
       const query = text.replace(/^@ai\s*/i, '');
-      socketRef.current?.emit('chat-message', { text });
+      socketRef.current?.emit('chat-message', { text, id: localMsgId });
       triggerAiCatchUp(query || 'What did I miss so far?');
     } else {
-      socketRef.current?.emit('chat-message', { text });
+      socketRef.current?.emit('chat-message', { text, id: localMsgId });
     }
 
     // Stop typing indicator

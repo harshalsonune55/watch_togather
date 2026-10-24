@@ -708,12 +708,12 @@ io.on("connection", (socket) => {
   // Real-time Chat & Social Handlers
   // ==========================================
 
-  socket.on("chat-message", ({ text }) => {
+  socket.on("chat-message", ({ text, id }) => {
     if (!currentRoomId || !text || !text.trim()) return;
     const room = getOrCreateRoom(currentRoomId);
 
     const message = {
-      id: "msg-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
+      id: id || ("msg-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6)),
       sender: currentUserName,
       senderId: socket.id,
       text: text.trim().substring(0, 1000),

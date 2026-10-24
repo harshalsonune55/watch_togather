@@ -301,15 +301,51 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // -----------------------------------------------
-  // Modals Binding
+  // Modals & Menu Bindings
   // -----------------------------------------------
 
   if (btnOpenVideoModal && videoModal) {
     btnOpenVideoModal.addEventListener("click", () => videoModal.classList.add("open"));
   }
+  const btnCardMenu1 = document.getElementById("btnCardMenu1");
+  if (btnCardMenu1 && videoModal) {
+    btnCardMenu1.addEventListener("click", () => videoModal.classList.add("open"));
+  }
   if (btnCloseModal && videoModal) {
     btnCloseModal.addEventListener("click", () => videoModal.classList.remove("open"));
   }
+
+  // -----------------------------------------------
+  // Theater / Cinema Mode Toggle
+  // -----------------------------------------------
+  const theaterGrid = document.getElementById("theaterGrid");
+  const btnToggleCinema = document.getElementById("btnToggleCinema");
+  const btnStageExpand = document.getElementById("btnStageExpand");
+  const btnDockCinemaToggle = document.getElementById("btnDockCinemaToggle");
+  const cinemaToggleIcon = document.getElementById("cinemaToggleIcon");
+  const cinemaToggleText = document.getElementById("cinemaToggleText");
+  const stageExpandIcon = document.getElementById("stageExpandIcon");
+  const stageExpandText = document.getElementById("stageExpandText");
+
+  function toggleCinemaMode() {
+    if (!theaterGrid) return;
+    const isCinema = theaterGrid.classList.toggle("cinema-active");
+
+    if (btnToggleCinema) btnToggleCinema.classList.toggle("active", isCinema);
+    if (btnDockCinemaToggle) btnDockCinemaToggle.classList.toggle("active-mint", isCinema);
+
+    if (cinemaToggleIcon) cinemaToggleIcon.className = isCinema ? "fa-solid fa-compress" : "fa-solid fa-expand";
+    if (cinemaToggleText) cinemaToggleText.textContent = isCinema ? "Side Dock" : "Cinema View";
+
+    if (stageExpandIcon) stageExpandIcon.className = isCinema ? "fa-solid fa-compress" : "fa-solid fa-expand";
+    if (stageExpandText) stageExpandText.textContent = isCinema ? "Exit Cinema" : "Cinema Mode";
+
+    showToast(isCinema ? "🎬 Fullstage Cinema Mode Active" : "📺 Standard Theater Mode Active");
+  }
+
+  if (btnToggleCinema) btnToggleCinema.addEventListener("click", toggleCinemaMode);
+  if (btnStageExpand) btnStageExpand.addEventListener("click", toggleCinemaMode);
+  if (btnDockCinemaToggle) btnDockCinemaToggle.addEventListener("click", toggleCinemaMode);
 
   if (formLoadVideo) {
     formLoadVideo.addEventListener("submit", (e) => {

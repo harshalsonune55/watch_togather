@@ -137,6 +137,12 @@
         </div>
 
         <div class="huddle-header-right">
+          <!-- Theater / Cinema View Toggle -->
+          <button class="btn-cinema-toggle" id="btnToggleCinema" title="Toggle Fullstage Cinema Mode">
+            <i class="fa-solid fa-expand" id="cinemaToggleIcon"></i>
+            <span id="cinemaToggleText">Cinema View</span>
+          </button>
+
           <!-- Recording / Live In-Sync Pill Button (from Virtual Huddle) -->
           <div class="btn-recording-pill" id="syncStatusBadge">
             <span class="recording-dot"></span>
@@ -148,20 +154,28 @@
         </div>
       </header>
 
-      <!-- Video Conference Grid (Matching Image 1: 4 Cards) -->
-      <div class="huddle-grid-container" id="theaterGrid">
+      <!-- Video Conference & Theater Grid (Big Stage Window + Small Profile Windows) -->
+      <div class="huddle-grid-container theater-layout" id="theaterGrid">
 
-        <!-- Card 1: Main Video Player / Screen Share (Top Left or Large) -->
-        <div class="huddle-video-card" id="stageSection" style="grid-column: 1 / 2; grid-row: 1 / 2;">
-          <button class="card-options-btn" id="btnCardMenu1" title="Options">•••</button>
+        <!-- BIG WINDOW: Main Video Stage / Movie Screen & Presenting Screen Share -->
+        <div class="huddle-video-card huddle-stage-card" id="stageSection">
+          
+          <!-- Stage Top Actions (Cinema / Theater Expand / Video Settings) -->
+          <div class="stage-top-actions">
+            <button class="stage-action-pill" id="btnStageExpand" title="Toggle Cinema View">
+              <i class="fa-solid fa-expand" id="stageExpandIcon"></i>
+              <span id="stageExpandText">Cinema Mode</span>
+            </button>
+            <button class="card-options-btn" id="btnCardMenu1" title="Video Settings">•••</button>
+          </div>
 
-          <!-- YouTube Player -->
-          <div id="ytPlayerWrapper" style="width: 100%; height: 100%; display: none;">
+          <!-- YouTube Player Wrapper -->
+          <div id="ytPlayerWrapper" class="stage-media-wrapper" style="display: none;">
             <div id="ytPlayer"></div>
           </div>
 
           <!-- HTML5 Video Player -->
-          <video id="html5Player" style="display: none; width: 100%; height: 100%; object-fit: contain;" playsinline></video>
+          <video id="html5Player" class="stage-media-wrapper stage-html5-video" style="display: none;" playsinline></video>
 
           <!-- Big Play Button Overlay -->
           <div class="play-overlay-btn" id="playOverlayBtn" title="Resume Playback">
@@ -175,7 +189,7 @@
 
           <!-- Screen Share Stage Display (When someone shares their screen) -->
           <div id="screenShareWrapper" class="screen-share-stage-wrapper" style="display: none;">
-            <video id="screenSharePlayer" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain; background: #000;"></video>
+            <video id="screenSharePlayer" autoplay playsinline class="screen-share-stage-video"></video>
             <div class="stage-screen-banner">
               <div class="screen-badge">
                 <i class="fa-solid fa-desktop" style="color: var(--mint);"></i>
@@ -194,65 +208,72 @@
           </div>
         </div>
 
-        <!-- Card 2: Remote Friend Webcam (Top Right) -->
-        <div class="huddle-video-card" id="remoteTile" style="grid-column: 2 / 3; grid-row: 1 / 2;">
-          <button class="card-options-btn" title="Options">•••</button>
-          
-          <video id="remoteVideo" class="huddle-stream-video" autoplay playsinline></video>
+        <!-- SMALL WINDOWS: Dedicated Side Column for User Profiles & Series Queue -->
+        <div class="huddle-side-column" id="sideProfilesColumn">
 
-          <!-- Illustrated Center Avatar Placeholder (from Virtual Huddle Image 1) -->
-          <div class="tile-avatar-placeholder show" id="remotePlaceholder" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #181b24;">
-            <div class="huddle-center-avatar lavender">
-              <i class="fa-solid fa-user-astronaut"></i>
+          <!-- Small Window 1: Remote Friend Webcam & Profile -->
+          <div class="huddle-video-card huddle-profile-small-card" id="remoteTile">
+            <button class="card-options-btn" title="Options">•••</button>
+            
+            <video id="remoteVideo" class="huddle-stream-video" autoplay playsinline></video>
+
+            <!-- Illustrated Center Avatar Placeholder -->
+            <div class="tile-avatar-placeholder show" id="remotePlaceholder">
+              <div class="huddle-center-avatar lavender">
+                <i class="fa-solid fa-user-astronaut"></i>
+              </div>
+              <div class="tile-placeholder-text">Waiting for friend...</div>
             </div>
-            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 10px;">Waiting for friend...</div>
-          </div>
 
-          <!-- Pastel Peach Badge (from Virtual Huddle: "Darrell Steward") -->
-          <div class="pastel-name-pill peach">
-            <i class="fa-solid fa-microphone" id="remoteMicIcon" style="font-size: 0.7rem;"></i>
-            <span id="remoteUserName">Darrell Steward</span>
-          </div>
-        </div>
-
-        <!-- Card 3: Local User Webcam (Bottom Left) -->
-        <div class="huddle-video-card" id="localTile" style="grid-column: 1 / 2; grid-row: 2 / 3;">
-          <button class="card-options-btn" title="Options">•••</button>
-
-          <video id="localVideo" class="huddle-stream-video" autoplay muted playsinline></video>
-
-          <!-- Illustrated Center Avatar Placeholder (from Virtual Huddle) -->
-          <div class="tile-avatar-placeholder" id="localPlaceholder" style="position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; background: #181b24;">
-            <div class="huddle-center-avatar mint">
-              <i class="fa-solid fa-user"></i>
+            <!-- Pastel Peach Badge: Remote User Profile -->
+            <div class="pastel-name-pill peach small-badge">
+              <i class="fa-solid fa-microphone" id="remoteMicIcon"></i>
+              <span id="remoteUserName">Darrell Steward</span>
             </div>
-            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 10px;">Camera Off</div>
           </div>
 
-          <!-- Pastel Coral Badge (from Virtual Huddle: "Bessie Cooper") -->
-          <div class="pastel-name-pill coral">
-            <i class="fa-solid fa-microphone" id="localMicIcon" style="font-size: 0.7rem;"></i>
-            <span id="localUserName">Bessie Cooper (You)</span>
+          <!-- Small Window 2: Local User Webcam & Profile (You) -->
+          <div class="huddle-video-card huddle-profile-small-card" id="localTile">
+            <button class="card-options-btn" title="Options">•••</button>
+
+            <video id="localVideo" class="huddle-stream-video" autoplay muted playsinline></video>
+
+            <!-- Illustrated Center Avatar Placeholder -->
+            <div class="tile-avatar-placeholder" id="localPlaceholder">
+              <div class="huddle-center-avatar mint">
+                <i class="fa-solid fa-user"></i>
+              </div>
+              <div class="tile-placeholder-text">Camera Off</div>
+            </div>
+
+            <!-- Pastel Coral Badge: Local User Profile -->
+            <div class="pastel-name-pill coral small-badge">
+              <i class="fa-solid fa-microphone" id="localMicIcon"></i>
+              <span id="localUserName">Bessie Cooper (You)</span>
+            </div>
           </div>
-        </div>
 
-        <!-- Card 4: Web Series Episodes & Playback Queue (Bottom Right) -->
-        <div class="huddle-video-card" id="queueTile" style="grid-column: 2 / 3; grid-row: 2 / 3; padding: 24px; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; overflow-y: auto;">
-          <button class="card-options-btn" id="btnOpenEpModal" title="Series">•••</button>
+          <!-- Small Window 3: Web Series Episodes & Playback Queue -->
+          <div class="huddle-video-card huddle-queue-small-card" id="queueTile">
+            <div class="queue-card-header">
+              <div class="queue-card-title">
+                <i class="fa-solid fa-list-ul" style="color: var(--mint); margin-right: 6px;"></i>
+                <span>PLAYLIST</span>
+              </div>
+              <span id="currentEpisodePill" class="queue-episode-pill">Episode 1</span>
+              <button class="card-options-btn queue-menu-btn" id="btnOpenEpModal" title="Series">•••</button>
+            </div>
 
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
-            <div style="font-size: 0.85rem; font-weight: 800; color: white;">EPISODES & PLAYLIST</div>
-            <span id="currentEpisodePill" style="font-size: 0.72rem; color: var(--mint); font-weight: 700;">Episode 1</span>
+            <!-- Episode quick list items inside card -->
+            <div class="episodes-list" id="episodesListContainer"></div>
+
+            <!-- Pastel Mint Badge: Queue info -->
+            <div class="pastel-name-pill mint small-badge" style="position: absolute; bottom: 8px; left: 10px;">
+              <i class="fa-solid fa-clapperboard"></i>
+              <span>Series Queue</span>
+            </div>
           </div>
 
-          <!-- Episode quick list items inside card -->
-          <div class="episodes-list" id="episodesListContainer" style="max-height: 180px; overflow-y: auto;"></div>
-
-          <!-- Pastel Mint Badge (from Virtual Huddle: "Esther Howard") -->
-          <div class="pastel-name-pill mint">
-            <i class="fa-solid fa-clapperboard"></i>
-            <span>Esther Howard (Series Queue)</span>
-          </div>
         </div>
 
       </div>
@@ -280,6 +301,11 @@
           <!-- Screen Share Button -->
           <button class="dock-circle-btn" id="btnShareScreen" title="Share Screen in Theater">
             <i class="fa-solid fa-arrow-up-from-bracket"></i>
+          </button>
+
+          <!-- Theater / Cinema Mode Toggle Button -->
+          <button class="dock-circle-btn" id="btnDockCinemaToggle" title="Toggle Cinema View">
+            <i class="fa-solid fa-tv" id="dockCinemaIcon"></i>
           </button>
 
           <!-- Resync / Options Button -->

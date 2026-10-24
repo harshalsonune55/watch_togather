@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Lobby from './components/Lobby.jsx';
+import Home from './components/Home.jsx';
 import Room from './components/Room.jsx';
 
 export default function App() {
@@ -30,5 +30,5 @@ export default function App() {
     return <Room roomId={roomId} initialName={name} onNavigate={navigate} />;
   }
 
-  return <Lobby onNavigate={navigate} />;
+  return <Home onNavigate={navigate} />;
 }

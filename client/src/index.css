@@ -2679,6 +2679,17 @@ body {
 .hero-text-accent {
   color: var(--mint);
   font-weight: 900;
+  display: inline-block;
+  animation: continuousLoopBreathe 3.5s ease-in-out infinite;
+}
+
+@keyframes continuousLoopBreathe {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2.5px);
+  }
 }
 
 .home-hero-subtitle {

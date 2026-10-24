@@ -3,6 +3,13 @@ import { Typewriter } from 'motion-plus/react';
 
 const DEMO_VIDEOS = [
   {
+    title: 'Watchooo Feature Showcase (YouTube)',
+    type: 'youtube',
+    source: 'oc_o5DZM3qc',
+    badge: 'YouTube • Live Lo-Fi',
+    desc: 'Continuous synchronized stream demo, plays silently in a loop.'
+  },
+  {
     title: 'Big Buck Bunny (HD Animation)',
     type: 'html5',
     source: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
@@ -22,13 +29,6 @@ const DEMO_VIDEOS = [
     source: '1ZYbU888YX8',
     badge: 'YouTube • 4K HDR',
     desc: 'Deep mountain waterfalls, wild rivers, and calming scenery.'
-  },
-  {
-    title: 'Lofi Hip Hop - Chill Beats (YouTube)',
-    type: 'youtube',
-    source: 'jfKfPfyJRdk',
-    badge: 'YouTube • Live Lo-Fi',
-    desc: 'Chill beats to study, talk, relax, and vibe together.'
   }
 ];
 
@@ -40,8 +40,15 @@ export default function Home({ onNavigate }) {
   const [videoLink, setVideoLink] = useState('');
   const [activeFaq, setActiveFaq] = useState(null);
 
-  // Active YouTube Demo Preview
-  const [activeYoutubeVideo, setActiveYoutubeVideo] = useState('jfKfPfyJRdk');
+  // Active YouTube Demo Preview (Plays continuously without audio)
+  const [activeYoutubeVideo, setActiveYoutubeVideo] = useState('oc_o5DZM3qc');
+  const [typewriterCycle, setTypewriterCycle] = useState(0);
+
+  const handleTypewriterDone = () => {
+    setTimeout(() => {
+      setTypewriterCycle((prev) => prev + 1);
+    }, 1800);
+  };
 
   useEffect(() => {
     localStorage.setItem('wt_username', displayName);
@@ -97,7 +104,8 @@ export default function Home({ onNavigate }) {
         </div>
 
         <button type="button" onClick={() => handleLaunchRoom()} className="btn-mint-pill">
-          <span>↗ Create Party</span>
+          <i className="fa-solid fa-door-open"></i>
+          <span>Enter Theater</span>
         </button>
       </nav>
 
@@ -111,7 +119,14 @@ export default function Home({ onNavigate }) {
         <h1 className="home-hero-title">
           <span className="hero-text-solid">Watch Any Video Together.</span><br />
           <span className="hero-text-accent">
-            <Typewriter speed="normal" variance="natural">In Total Real-Time Sync.</Typewriter>
+            <Typewriter
+              key={typewriterCycle}
+              speed="normal"
+              variance="natural"
+              onComplete={handleTypewriterDone}
+            >
+              In Total Real-Time Sync.
+            </Typewriter>
           </span>
         </h1>
 
@@ -181,7 +196,8 @@ export default function Home({ onNavigate }) {
             </div>
 
             <button type="submit" className="btn-mint-pill launch-btn">
-              <span>↗ Launch Watchooo Theater</span>
+              <i className="fa-solid fa-door-open"></i>
+              <span>Enter Theater</span>
             </button>
           </form>
         </div>
@@ -216,7 +232,7 @@ export default function Home({ onNavigate }) {
               <div className="demo-video-embed-box">
                 <iframe
                   className="demo-youtube-iframe"
-                  src={`https://www.youtube-nocookie.com/embed/${activeYoutubeVideo}?enablejsapi=1&rel=0&modestbranding=1`}
+                  src={`https://www.youtube-nocookie.com/embed/${activeYoutubeVideo}?autoplay=1&mute=1&loop=1&playlist=${activeYoutubeVideo}&enablejsapi=1&playsinline=1&controls=0&rel=0&modestbranding=1`}
                   title="Watchooo Product Demo Video"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
@@ -233,7 +249,8 @@ export default function Home({ onNavigate }) {
                   className="btn-mint-pill"
                   style={{ padding: '6px 14px', fontSize: '0.78rem' }}
                 >
-                  <span>↗ Open in Theater</span>
+                  <i className="fa-solid fa-door-open"></i>
+                  <span>Enter Theater</span>
                 </button>
               </div>
             </div>
@@ -243,15 +260,15 @@ export default function Home({ onNavigate }) {
           <div className="demo-description-col">
             <div className="demo-desc-badge">
               <i className="fa-solid fa-sparkles" style={{ color: 'var(--mint)' }}></i>
-              <span>Total Real-Time Cinema</span>
+              <span>Real-Time Sync Demo</span>
             </div>
 
             <h3 className="demo-desc-heading">
-              Watch Together Without The Hassle of "3, 2, 1... Play!"
+              Stream in Lockstep Sync
             </h3>
 
             <p className="demo-desc-lead">
-              Watchooo brings your movie nights, YouTube streams, and binge sessions into seamless real-time lockstep. No more counting down or asking "what minute are you on?" — every pause, seek, and frame is calibrated with millisecond precision.
+              Watch movies and YouTube streams with zero lag, 2-way WebRTC facecams, and instant AI scene recaps.
             </p>
 
             <div className="demo-features-checklist">
@@ -260,8 +277,8 @@ export default function Home({ onNavigate }) {
                   <i className="fa-solid fa-check"></i>
                 </div>
                 <div className="check-text-box">
-                  <h4 className="check-title">Zero-Drift Playback Sync</h4>
-                  <p className="check-desc">Server heartbeat calibration keeps everyone locked to the exact same video frame without audio drift.</p>
+                  <h4 className="check-title">Zero-Drift Playback</h4>
+                  <p className="check-desc">Every pause, seek, and frame is calibrated in real-time across all viewers.</p>
                 </div>
               </div>
 
@@ -270,8 +287,8 @@ export default function Home({ onNavigate }) {
                   <i className="fa-solid fa-check"></i>
                 </div>
                 <div className="check-text-box">
-                  <h4 className="check-title">2-Way HD Video &amp; Voice Calling</h4>
-                  <p className="check-desc">See your friends' live facial reactions and hear crisp WebRTC audio with animated speaking wave detection.</p>
+                  <h4 className="check-title">2-Way HD Video &amp; Voice</h4>
+                  <p className="check-desc">Low-latency WebRTC facecams with animated speaking detection.</p>
                 </div>
               </div>
 
@@ -280,18 +297,8 @@ export default function Home({ onNavigate }) {
                   <i className="fa-solid fa-check"></i>
                 </div>
                 <div className="check-text-box">
-                  <h4 className="check-title">✨ Groq AI Assistant for Latecomers</h4>
-                  <p className="check-desc">Friends who join late can tap "Catch Up" to receive a crisp 3-bullet scene summary in 300ms without pausing the show.</p>
-                </div>
-              </div>
-
-              <div className="checklist-item">
-                <div className="check-icon-circle">
-                  <i className="fa-solid fa-check"></i>
-                </div>
-                <div className="check-text-box">
-                  <h4 className="check-title">Screen &amp; Tab Audio Sharing</h4>
-                  <p className="check-desc">Broadcast Netflix, Disney+, Anime tabs, or desktop games directly to the big theater screen with integrated audio.</p>
+                  <h4 className="check-title">✨ Groq AI Co-Pilot</h4>
+                  <p className="check-desc">Instant 300ms scene recap for friends who join the room late.</p>
                 </div>
               </div>
             </div>
@@ -302,11 +309,9 @@ export default function Home({ onNavigate }) {
                 onClick={() => handleLaunchRoom(activeYoutubeVideo)}
                 className="btn-mint-pill demo-launch-cta-btn"
               >
-                <span>↗ Launch Synchronized Room</span>
+                <i className="fa-solid fa-door-open"></i>
+                <span>Enter Theater</span>
               </button>
-              <a href="#start-party" className="btn-clean-secondary demo-custom-cta-btn">
-                <span>Custom Video Party</span>
-              </a>
             </div>
           </div>
         </div>

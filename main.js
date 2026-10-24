@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const path = require("path");
+const fs = require("fs");
 const os = require("os");
 const { Server } = require("socket.io");
 const methodOverride = require("method-override");
@@ -138,12 +139,87 @@ app.engine("ejs", engine);
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
+// Serve built React frontend from client/dist if present
+const clientDistPath = path.join(__dirname, "client", "dist");
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+}
+
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(methodOverride("_method"));
 
-// Routes
+// AI Co-Pilot Assistant API (Groq LLaMA 3.3)
+app.post("/api/ai/catch-up", async (req, res) => {
+  const { roomId, currentTime, videoTitle, recentMessages, prompt } = req.body || {};
+  const apiKey = process.env.GROQ_API_KEY;
+
+  if (!apiKey) {
+    return res.json({
+      summary: `🍿 **Watchooo AI Co-Pilot**:\n• You are currently watching **${videoTitle || 'the video'}** at **${currentTime || '00:00'}**!\n• To activate real-time LLaMA 3.3 intelligent summaries for latecomers, add \`GROQ_API_KEY=...\` to your \`.env\` file.`
+    });
+  }
+
+  try {
+    const formattedChat = (recentMessages || [])
+      .map(m => `${m.sender}: ${m.text}`)
+      .join("\n") || "No chat messages yet.";
+
+    const systemPrompt = `You are Watchooo AI, a friendly, hyper-concise co-pilot for a synchronized video watch party. The user joined the room late or asked for an update. Provide a crisp 2-3 bullet point summary catching them up on what's happening right now in the video and what friends in the room are saying. Keep it engaging, fun, and brief (under 80 words).`;
+
+    const userContent = `Video: ${videoTitle || 'Live Video'}
+Current Timestamp: ${currentTime || '00:00'}
+Recent Room Chat:
+${formattedChat}
+User Request: ${prompt || 'What did I miss?'}`;
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent }
+        ],
+        temperature: 0.6,
+        max_tokens: 250
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.warn("Groq API error response:", errText);
+      return res.json({
+        summary: `🍿 You're watching **${videoTitle || 'the video'}** at **${currentTime || '00:00'}**. Chat is active, jump right in!`
+      });
+    }
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content || `🍿 Catching you up: watching **${videoTitle}** at **${currentTime}**!`;
+    return res.json({ summary: reply });
+  } catch (err) {
+    console.error("AI Catch-Up exception:", err);
+    return res.json({
+      summary: `🍿 You're watching **${videoTitle || 'the video'}** at **${currentTime || '00:00'}**! Have fun watching together!`
+    });
+  }
+});
+
+// React SPA Route Handler (Serves React index.html for all page routes)
+app.get("*", (req, res, next) => {
+  const indexPath = path.join(__dirname, "client", "dist", "index.html");
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  next();
+});
+
+// Routes (EJS Fallbacks)
 // 1. Landing / Lobby page
 app.get("/", (req, res) => {
   res.render("lobby.ejs");

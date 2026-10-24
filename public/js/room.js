@@ -14,16 +14,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize Socket.IO connection
   const socket = io();
 
-  // State
-  let currentPlaylist = [];
-  let currentEpisodeIndex = 0;
-  let allSeries = [];
-  let activeSeriesId = "scifi-series";
-
   // DOM Elements
   const statusBadge = document.getElementById("syncStatusBadge");
   const statusText = document.getElementById("syncStatusText");
-  const currentEpisodePill = document.getElementById("currentEpisodePill");
   const btnPlayPause = document.getElementById("btnPlayPause");
   const playOverlayBtn = document.getElementById("playOverlayBtn");
   const timelineProgress = document.getElementById("timelineProgress");
@@ -34,7 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnResync = document.getElementById("btnResync");
   const btnResyncSidebar = document.getElementById("btnResyncSidebar");
   const btnOpenVideoModal = document.getElementById("btnOpenVideoModal");
-  const btnOpenEpModal = document.getElementById("btnOpenEpModal");
   const stageBadgeText = document.getElementById("stageBadgeText");
   const localUserName = document.getElementById("localUserName");
   const sidebarUserName = document.getElementById("sidebarUserName");
@@ -45,8 +37,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Modals & Inputs
   const videoModal = document.getElementById("videoModal");
   const btnCloseModal = document.getElementById("btnCloseModal");
-  const episodesModal = document.getElementById("episodesModal");
-  const btnCloseEpModal = document.getElementById("btnCloseEpModal");
   const formLoadVideo = document.getElementById("formLoadVideo");
   const inputVideoUrl = document.getElementById("inputVideoUrl");
   const inputLocalFile = document.getElementById("inputLocalFile");
@@ -89,16 +79,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    if (data.playlist) currentPlaylist = data.playlist;
-    if (typeof data.currentEpisodeIndex === "number") currentEpisodeIndex = data.currentEpisodeIndex;
-    if (data.webSeries) allSeries = data.webSeries;
-    if (data.currentSeries) activeSeriesId = data.currentSeries.id;
-
-    updateEpisodePillUI();
-    renderEpisodesList();
-
-    // Load initial video
-    if (data.video) {
+    // Load initial video if available
+    if (data.video && data.video.source) {
       syncEngine.loadVideo(data.video.type, data.video.source, data.video.title);
       if (stageBadgeText) stageBadgeText.textContent = data.video.title.substring(0, 28);
       if (data.video.currentTime > 0) {
@@ -109,6 +91,8 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }, 800);
       }
+    } else {
+      syncEngine.loadVideo(null, null, "Waiting for video link or screen share");
     }
 
     // Load chat history
@@ -117,31 +101,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Episode Change Broadcast
-  socket.on("episode-change", (data) => {
-    currentEpisodeIndex = data.index;
-    if (stageBadgeText) stageBadgeText.textContent = data.video.title.substring(0, 28);
-    updateEpisodePillUI();
-    renderEpisodesList();
-    showToast(`🎬 Playing ${data.video.title}`);
-  });
-
-  // Series Change Broadcast
-  socket.on("series-changed", (data) => {
-    activeSeriesId = data.series.id;
-    currentPlaylist = data.playlist;
-    currentEpisodeIndex = 0;
-    if (stageBadgeText) stageBadgeText.textContent = data.video.title.substring(0, 28);
-    updateEpisodePillUI();
-    renderEpisodesList();
-    showToast(`🍿 Switched series to "${data.series.title}"`);
-  });
-
   // Video Change Broadcast
   socket.on("video-change", (data) => {
     if (stageBadgeText && data.video.title) {
       stageBadgeText.textContent = data.video.title.substring(0, 28);
     }
+    showToast(`🎬 Loaded: ${data.video.title}`);
   });
 
   // Local File Sync Request from peer
@@ -236,56 +201,14 @@ document.addEventListener("DOMContentLoaded", () => {
     btnShareScreen.addEventListener("click", () => webrtcCall.toggleScreenShare());
   }
 
-  // -----------------------------------------------
-  // Sidebar Web Series selection
-  // -----------------------------------------------
-  const sidebarSeriesItems = document.querySelectorAll(".sidebar-series-select");
-  sidebarSeriesItems.forEach((item) => {
-    item.addEventListener("click", () => {
-      const sid = item.getAttribute("data-series-id");
-      if (sid) {
-        sidebarSeriesItems.forEach((it) => it.classList.remove("active"));
-        item.classList.add("active");
-        socket.emit("series-select", { seriesId: sid });
-      }
-    });
-  });
-
-  function renderEpisodesList() {
-    const listEl = document.getElementById("episodesListContainer");
-    if (!listEl) return;
-
-    listEl.innerHTML = "";
-
-    currentPlaylist.forEach((ep, index) => {
-      const isCurrent = index === currentEpisodeIndex;
-      const item = document.createElement("div");
-      item.className = `episode-item ${isCurrent ? "active" : ""}`;
-      item.innerHTML = `
-        <div class="ep-left">
-          <div class="ep-num-badge">${isCurrent ? '<i class="fa-solid fa-play" style="font-size:0.6rem"></i>' : index + 1}</div>
-          <div>
-            <div class="ep-title" style="font-size: 0.8rem; font-weight: 600;">${ep.title}</div>
-            <div class="ep-duration" style="font-size: 0.7rem; color: var(--text-dim);">${ep.duration || "Full"}</div>
-          </div>
-        </div>
-        <div>
-          ${isCurrent ? '<span style="font-size:0.7rem; color:var(--mint); font-weight:800;">PLAYING</span>' : '<span style="font-size:0.7rem; color:var(--text-dim);"><i class="fa-solid fa-play"></i></span>'}
-        </div>
-      `;
-
-      item.addEventListener("click", () => {
-        socket.emit("episode-select", { index });
-      });
-
-      listEl.appendChild(item);
-    });
+  // Empty Stage Action Buttons
+  const btnEmptyLoadLink = document.getElementById("btnEmptyLoadLink");
+  if (btnEmptyLoadLink && videoModal) {
+    btnEmptyLoadLink.addEventListener("click", () => videoModal.classList.add("open"));
   }
-
-  function updateEpisodePillUI() {
-    if (currentEpisodePill) {
-      currentEpisodePill.textContent = `Episode ${currentEpisodeIndex + 1}/${currentPlaylist.length || 1}`;
-    }
+  const btnEmptyShareScreen = document.getElementById("btnEmptyShareScreen");
+  if (btnEmptyShareScreen) {
+    btnEmptyShareScreen.addEventListener("click", () => webrtcCall.toggleScreenShare());
   }
 
   // Local File Selector
@@ -358,17 +281,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
-
-  const sampleCards = document.querySelectorAll(".modal-sample-card");
-  sampleCards.forEach((card) => {
-    card.addEventListener("click", () => {
-      const source = card.getAttribute("data-source");
-      const title = card.getAttribute("data-title");
-      const type = card.getAttribute("data-type");
-      socket.emit("video-change", { source, title, type });
-      videoModal.classList.remove("open");
-    });
-  });
 
   function showToast(message) {
     if (!toastNotice) return;

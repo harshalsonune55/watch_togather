@@ -225,14 +225,30 @@ class SyncEngine {
   // -----------------------------------------------
 
   loadVideo(type, source, title) {
-    this.playerType = type;
+    const emptyState = document.getElementById("stageEmptyState");
     const titleEl = document.getElementById("stageVideoTitle");
     if (titleEl && title) titleEl.textContent = title;
 
+    if (!source) {
+      this.playerType = null;
+      if (this.html5Player) {
+        this.html5Player.pause();
+        this.html5Player.style.display = "none";
+      }
+      if (this.ytWrapper) this.ytWrapper.style.display = "none";
+      if (emptyState) emptyState.style.display = "flex";
+      return;
+    }
+
+    if (emptyState) emptyState.style.display = "none";
+    this.playerType = type;
+
     if (type === "youtube") {
-      this.html5Player.pause();
-      this.html5Player.style.display = "none";
-      this.ytWrapper.style.display = "block";
+      if (this.html5Player) {
+        this.html5Player.pause();
+        this.html5Player.style.display = "none";
+      }
+      if (this.ytWrapper) this.ytWrapper.style.display = "block";
 
       if (this.ytPlayer && typeof this.ytPlayer.loadVideoById === "function") {
         this.ytPlayer.loadVideoById(source, 0);
@@ -245,16 +261,20 @@ class SyncEngine {
       if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === "function") {
         this.ytPlayer.pauseVideo();
       }
-      this.ytWrapper.style.display = "none";
-      this.html5Player.style.display = "block";
-      this.html5Player.src = source;
-      this.html5Player.load();
-      this.bindHtml5Events();
+      if (this.ytWrapper) this.ytWrapper.style.display = "none";
+      if (this.html5Player) {
+        this.html5Player.style.display = "block";
+        this.html5Player.src = source;
+        this.html5Player.load();
+        this.bindHtml5Events();
+      }
     }
   }
 
   loadLocalFile(file) {
     if (!file) return;
+    const emptyState = document.getElementById("stageEmptyState");
+    if (emptyState) emptyState.style.display = "none";
     this.playerType = "html5";
     const objectUrl = URL.createObjectURL(file);
     const titleEl = document.getElementById("stageVideoTitle");

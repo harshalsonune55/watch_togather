@@ -207,7 +207,18 @@ class WebRTCCall {
       }
     });
 
-    // 6. Remote screen share status announcement
+    // 6. Peer speaking status (moving three dots animation)
+    this.socket.on("peer-speaking", ({ speaking }) => {
+      if (this.remoteTile) {
+        if (speaking) {
+          this.remoteTile.classList.add("speaking");
+        } else {
+          this.remoteTile.classList.remove("speaking");
+        }
+      }
+    });
+
+    // 7. Remote screen share status announcement
     this.socket.on("screen-share-status", ({ isSharing, sharerName, streamId }) => {
       if (isSharing) {
         this.remoteScreenStreamId = streamId;
@@ -499,6 +510,7 @@ class WebRTCCall {
     const wrapper = document.getElementById("screenShareWrapper");
     const ytWrapper = document.getElementById("ytPlayerWrapper");
     const html5Player = document.getElementById("html5Player");
+    const emptyState = document.getElementById("stageEmptyState");
     const titleEl = document.getElementById("stageVideoTitle");
     const ownerEl = document.getElementById("screenShareOwner");
     const btnStop = document.getElementById("btnStopStageScreen");
@@ -507,6 +519,7 @@ class WebRTCCall {
       if (wrapper) wrapper.style.display = "flex";
       if (ytWrapper) ytWrapper.style.display = "none";
       if (html5Player) html5Player.style.display = "none";
+      if (emptyState) emptyState.style.display = "none";
 
       if (ownerEl) {
         ownerEl.textContent = isSelf ? "Your Screen Share" : `${sharerName}'s Screen Share`;
@@ -534,13 +547,13 @@ class WebRTCCall {
         stageBadgeText.textContent = this.savedTitle.substring(0, 28);
       }
 
-      // Restore active video player in stage
-      if (window.syncEngine) {
-        if (window.syncEngine.playerType === "youtube") {
-          if (ytWrapper) ytWrapper.style.display = "block";
-        } else {
-          if (html5Player) html5Player.style.display = "block";
-        }
+      // Restore active video player in stage or show empty state
+      if (window.syncEngine && window.syncEngine.playerType === "youtube") {
+        if (ytWrapper) ytWrapper.style.display = "block";
+      } else if (window.syncEngine && window.syncEngine.playerType === "html5") {
+        if (html5Player) html5Player.style.display = "block";
+      } else {
+        if (emptyState) emptyState.style.display = "flex";
       }
     }
   }
@@ -613,6 +626,8 @@ class WebRTCCall {
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
 
+      let isSpeakingBroadcast = false;
+
       const checkVolume = () => {
         analyser.getByteFrequencyData(dataArray);
         let sum = 0;
@@ -621,10 +636,21 @@ class WebRTCCall {
         }
         const average = sum / bufferLength;
 
-        if (average > 18) {
+        const isSpeaking = average > 14;
+        if (isSpeaking) {
           targetTile.classList.add("speaking");
         } else {
           targetTile.classList.remove("speaking");
+        }
+
+        if (targetTile === this.localTile) {
+          if (isSpeaking && !isSpeakingBroadcast) {
+            isSpeakingBroadcast = true;
+            this.socket.emit("peer-speaking", { speaking: true });
+          } else if (!isSpeaking && isSpeakingBroadcast) {
+            isSpeakingBroadcast = false;
+            this.socket.emit("peer-speaking", { speaking: false });
+          }
         }
 
         requestAnimationFrame(checkVolume);

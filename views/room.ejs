@@ -44,19 +44,30 @@
         </ul>
       </div>
 
-      <!-- SERIES & EPISODES (COURSES in image) -->
+      <!-- PLAYBACK SOURCES -->
       <div class="sidebar-nav-section">
-        <div class="sidebar-section-title">SERIES & PLAYLISTS</div>
+        <div class="sidebar-section-title">PLAYBACK SOURCES</div>
         <ul class="sidebar-menu-list">
-          <% webSeries.forEach(function(s, idx) { %>
-            <li class="sidebar-menu-item sidebar-series-select <%= idx === 0 ? 'active' : '' %>" data-series-id="<%= s.id %>">
-              <div class="menu-item-left">
-                <i class="fa-regular fa-folder"></i>
-                <span style="max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= s.title.split(':')[0] %></span>
-              </div>
-              <span class="menu-badge-red"><%= s.episodes.length %></span>
-            </li>
-          <% }); %>
+          <li class="sidebar-menu-item active" id="btnSidebarDirectLink">
+            <div class="menu-item-left">
+              <i class="fa-solid fa-link"></i>
+              <span>Direct Link</span>
+            </div>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.7rem; color: var(--mint);"></i>
+          </li>
+          <li class="sidebar-menu-item" id="btnSidebarScreenShare">
+            <div class="menu-item-left">
+              <i class="fa-solid fa-desktop"></i>
+              <span>Screen Share</span>
+            </div>
+            <span class="menu-badge-red" style="background: var(--mint); color: #0c0d11; font-weight: 800;">LIVE</span>
+          </li>
+          <li class="sidebar-menu-item" id="btnOpenLocalFile">
+            <div class="menu-item-left">
+              <i class="fa-regular fa-file-video"></i>
+              <span>Local File</span>
+            </div>
+          </li>
         </ul>
       </div>
 
@@ -182,9 +193,23 @@
             <i class="fa-solid fa-play" style="margin-left: 4px;"></i>
           </div>
 
-          <!-- Autoplay Next Episode Banner -->
-          <div class="autoplay-banner" id="autoplayBanner">
-            <span>⏭️ Next episode starts in <strong>5s</strong>...</span>
+          <!-- Standby Empty State (When no direct link is loaded yet) -->
+          <div id="stageEmptyState" class="stage-empty-state" style="<%= (video && video.source) ? 'display: none;' : 'display: flex;' %>">
+            <div class="empty-state-icon">
+              <i class="fa-solid fa-film"></i>
+            </div>
+            <h2 class="empty-state-title">Synchronized Theater Ready</h2>
+            <p class="empty-state-desc">Paste any YouTube URL or direct MP4 stream to watch in sync, or share your screen directly on stage.</p>
+            <div class="empty-state-actions">
+              <button class="btn-mint-pill" id="btnEmptyLoadLink" type="button">
+                <i class="fa-solid fa-link"></i>
+                <span>Paste Video Link</span>
+              </button>
+              <button class="btn-glass-pill" id="btnEmptyShareScreen" type="button">
+                <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                <span>Share Screen</span>
+              </button>
+            </div>
           </div>
 
           <!-- Screen Share Stage Display (When someone shares their screen) -->
@@ -208,12 +233,17 @@
           </div>
         </div>
 
-        <!-- SMALL WINDOWS: Dedicated Side Column for User Profiles & Series Queue -->
+        <!-- SMALL WINDOWS: Dedicated Side Column for User Profiles & Live Chat -->
         <div class="huddle-side-column" id="sideProfilesColumn">
 
           <!-- Small Window 1: Remote Friend Webcam & Profile -->
           <div class="huddle-video-card huddle-profile-small-card" id="remoteTile">
-            <button class="card-options-btn" title="Options">•••</button>
+            <!-- Animated Moving Dots on Speaking -->
+            <div class="card-dots-badge" id="remoteDotsBadge" title="Speaking Activity">
+              <span class="speaking-dot d1"></span>
+              <span class="speaking-dot d2"></span>
+              <span class="speaking-dot d3"></span>
+            </div>
             
             <video id="remoteVideo" class="huddle-stream-video" autoplay playsinline></video>
 
@@ -234,7 +264,12 @@
 
           <!-- Small Window 2: Local User Webcam & Profile (You) -->
           <div class="huddle-video-card huddle-profile-small-card" id="localTile">
-            <button class="card-options-btn" title="Options">•••</button>
+            <!-- Animated Moving Dots on Speaking -->
+            <div class="card-dots-badge" id="localDotsBadge" title="Speaking Activity">
+              <span class="speaking-dot d1"></span>
+              <span class="speaking-dot d2"></span>
+              <span class="speaking-dot d3"></span>
+            </div>
 
             <video id="localVideo" class="huddle-stream-video" autoplay muted playsinline></video>
 
@@ -253,24 +288,42 @@
             </div>
           </div>
 
-          <!-- Small Window 3: Web Series Episodes & Playback Queue -->
-          <div class="huddle-video-card huddle-queue-small-card" id="queueTile">
-            <div class="queue-card-header">
-              <div class="queue-card-title">
-                <i class="fa-solid fa-list-ul" style="color: var(--mint); margin-right: 6px;"></i>
-                <span>PLAYLIST</span>
+          <!-- Small Window 3: Live In-Room Chat Section -->
+          <div class="huddle-video-card huddle-chat-inline-card" id="chatCardTile">
+            <!-- Chat Header -->
+            <div class="chat-inline-header">
+              <div class="chat-header-left">
+                <i class="fa-regular fa-message" style="color: var(--mint); font-size: 0.85rem;"></i>
+                <span class="chat-title-text">ROOM CHAT</span>
               </div>
-              <span id="currentEpisodePill" class="queue-episode-pill">Episode 1</span>
-              <button class="card-options-btn queue-menu-btn" id="btnOpenEpModal" title="Series">•••</button>
+              <div class="chat-live-badge">
+                <span class="chat-live-dot"></span>
+                <span>Live</span>
+              </div>
             </div>
 
-            <!-- Episode quick list items inside card -->
-            <div class="episodes-list" id="episodesListContainer"></div>
+            <!-- Messages Stream -->
+            <div class="chat-inline-messages" id="messagesList"></div>
 
-            <!-- Pastel Mint Badge: Queue info -->
-            <div class="pastel-name-pill mint small-badge" style="position: absolute; bottom: 8px; left: 10px;">
-              <i class="fa-solid fa-clapperboard"></i>
-              <span>Series Queue</span>
+            <!-- Typing indicator -->
+            <div class="typing-indicator" id="typingIndicator"></div>
+
+            <!-- Emoji reactions row -->
+            <div class="chat-inline-emoji-bar">
+              <button type="button" class="btn-emoji" data-emoji="❤️" title="Love">❤️</button>
+              <button type="button" class="btn-emoji" data-emoji="🔥" title="Fire">🔥</button>
+              <button type="button" class="btn-emoji" data-emoji="😂" title="Laugh">😂</button>
+              <button type="button" class="btn-emoji" data-emoji="🍿" title="Popcorn">🍿</button>
+              <button type="button" class="btn-emoji" data-emoji="👏" title="Clap">👏</button>
+              <button type="button" class="btn-emoji" data-emoji="🚀" title="Rocket">🚀</button>
+            </div>
+
+            <!-- Chat input form -->
+            <div class="chat-inline-input-wrapper">
+              <input type="text" id="chatInput" class="clean-input-box chat-inline-input" placeholder="Send a message..." autocomplete="off">
+              <button type="button" id="btnSendChat" class="btn-mint-pill chat-inline-send-btn" title="Send message">
+                <i class="fa-solid fa-paper-plane"></i>
+              </button>
             </div>
           </div>
 
@@ -283,11 +336,6 @@
         
         <!-- Main Controls Dock Pill -->
         <div class="huddle-dock">
-          <!-- Hamburger / Drawer Button -->
-          <button class="dock-circle-btn" id="btnToggleSidebar" title="Toggle Navigation">
-            <i class="fa-solid fa-bars"></i>
-          </button>
-
           <!-- Microphone Toggle Button -->
           <button class="dock-circle-btn" id="btnToggleMic" title="Mute/Unmute Mic">
             <i class="fa-solid fa-microphone"></i>
@@ -326,7 +374,7 @@
 
         <!-- Chat & Reactions Dock Pill (Bottom Right in Virtual Huddle) -->
         <div class="huddle-side-dock">
-          <button class="dock-circle-btn" id="btnToggleChat" title="Chat">
+          <button class="dock-circle-btn" id="btnToggleChat" title="Focus Chat">
             <i class="fa-regular fa-message"></i>
           </button>
           <button class="dock-circle-btn" id="btnOpenReactions" title="Emoji Burst">
@@ -362,65 +410,26 @@
 
   </div>
 
-  <!-- Slide-Out Chat Drawer (Clean UI) -->
-  <aside class="huddle-chat-drawer" id="chatDrawer">
-    <div class="chat-drawer-header">
-      <div style="font-weight: 800; color: white; font-size: 1rem;"><i class="fa-regular fa-message" style="margin-right: 8px; color: var(--mint);"></i>Room Chat</div>
-      <button class="btn-close-drawer" id="btnCloseChatDrawer">✕</button>
-    </div>
-
-    <!-- Messages List -->
-    <div class="messages-list" id="messagesList" style="flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;"></div>
-
-    <!-- Typing Indicator -->
-    <div class="typing-indicator" id="typingIndicator" style="padding: 4px 16px; font-size: 0.75rem; color: var(--text-dim);"></div>
-
-    <!-- Floating Emoji Reaction Bar -->
-    <div class="emoji-bar" style="padding: 8px 14px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-around;">
-      <button class="btn-emoji" data-emoji="❤️" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">❤️</button>
-      <button class="btn-emoji" data-emoji="🔥" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">🔥</button>
-      <button class="btn-emoji" data-emoji="😂" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">😂</button>
-      <button class="btn-emoji" data-emoji="🍿" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">🍿</button>
-      <button class="btn-emoji" data-emoji="👏" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">👏</button>
-      <button class="btn-emoji" data-emoji="🚀" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">🚀</button>
-    </div>
-
-    <!-- Chat Input -->
-    <div style="padding: 12px 16px; border-top: 1px solid var(--border-subtle); display: flex; gap: 8px;">
-      <input type="text" id="chatInput" class="clean-input-box" placeholder="Type a message..." style="margin-bottom: 0; padding: 10px 14px; font-size: 0.85rem;" autocomplete="off">
-      <button id="btnSendChat" class="btn-mint-pill" style="padding: 10px 14px; font-size: 0.85rem;">
-        <i class="fa-solid fa-paper-plane"></i>
-      </button>
-    </div>
-  </aside>
-
-  <!-- Video Settings / Change Link Modal -->
+  <!-- Direct Video URL Modal -->
   <div class="modal-backdrop" id="videoModal">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title">Load Video / Series</h3>
+        <h3 class="modal-title">Load Direct Video</h3>
         <button class="btn-close-drawer" id="btnCloseModal">✕</button>
       </div>
 
       <form id="formLoadVideo">
         <label class="input-label-clean" for="inputVideoUrl">Video URL (YouTube or Direct MP4 / Web Stream)</label>
-        <input type="text" id="inputVideoUrl" class="clean-input-box" placeholder="Paste YouTube link or direct video file URL" required>
+        <input type="text" id="inputVideoUrl" class="clean-input-box" placeholder="https://www.youtube.com/watch?v=... or direct MP4 URL" required>
 
-        <button type="submit" class="btn-mint-pill" style="width: 100%; padding: 12px; margin-top: 6px;">
+        <p style="font-size: 0.75rem; color: var(--text-dim); margin: 6px 0 16px;">
+          Both participants will instantly switch to this video in lockstep synchronization.
+        </p>
+
+        <button type="submit" class="btn-mint-pill" style="width: 100%; padding: 12px;">
           <span>↗ Load & Sync with Partner</span>
         </button>
       </form>
-
-      <!-- Instant Samples -->
-      <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; margin: 20px 0 10px;">Quick Demos</div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-        <% sampleVideos.forEach(function(vid) { %>
-          <div class="sample-card modal-sample-card" data-source="<%= vid.source %>" data-title="<%= vid.title %>" data-type="<%= vid.type %>" style="border-radius: var(--radius-sm); padding: 10px; background: var(--bg-card); cursor: pointer;">
-            <div style="font-size: 0.65rem; color: var(--mint); font-weight: 700;"><%= vid.badge %></div>
-            <div style="font-size: 0.8rem; font-weight: 600; color: white;"><%= vid.title %></div>
-          </div>
-        <% }); %>
-      </div>
     </div>
   </div>
 
@@ -449,28 +458,30 @@
   <script src="/js/room.js"></script>
 
   <script>
-    // Chat Drawer Toggle
+    // Focus inline chat when chat button clicked
     const btnToggleChat = document.getElementById('btnToggleChat');
-    const btnCloseChatDrawer = document.getElementById('btnCloseChatDrawer');
-    const chatDrawer = document.getElementById('chatDrawer');
-
-    if (btnToggleChat && chatDrawer) {
+    const chatInput = document.getElementById('chatInput');
+    if (btnToggleChat && chatInput) {
       btnToggleChat.addEventListener('click', () => {
-        chatDrawer.classList.toggle('open');
-      });
-    }
-    if (btnCloseChatDrawer && chatDrawer) {
-      btnCloseChatDrawer.addEventListener('click', () => {
-        chatDrawer.classList.remove('open');
+        chatInput.focus();
+        chatInput.style.borderColor = 'var(--mint)';
+        setTimeout(() => chatInput.style.borderColor = '', 1200);
       });
     }
 
-    // Toggle Left Sidebar
-    const btnToggleSidebar = document.getElementById('btnToggleSidebar');
-    const sidebar = document.querySelector('.huddle-sidebar');
-    if (btnToggleSidebar && sidebar) {
-      btnToggleSidebar.addEventListener('click', () => {
-        sidebar.style.display = sidebar.style.display === 'none' ? 'flex' : 'none';
+    // Sidebar playback source buttons
+    const btnSidebarDirectLink = document.getElementById('btnSidebarDirectLink');
+    const videoModal = document.getElementById('videoModal');
+    if (btnSidebarDirectLink && videoModal) {
+      btnSidebarDirectLink.addEventListener('click', () => {
+        videoModal.classList.add('open');
+      });
+    }
+
+    const btnSidebarScreenShare = document.getElementById('btnSidebarScreenShare');
+    if (btnSidebarScreenShare && window.webrtcCall) {
+      btnSidebarScreenShare.addEventListener('click', () => {
+        window.webrtcCall.toggleScreenShare();
       });
     }
 

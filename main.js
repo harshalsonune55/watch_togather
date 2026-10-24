@@ -18,151 +18,13 @@ const io = new Server(server, {
 
 const port = process.env.PORT || 8080;
 
-// Curated Web Series with multiple episodes ready to watch together!
-const WEB_SERIES = [
-  {
-    id: "scifi-series",
-    title: "Cyberpunk 2099: The Sci-Fi Web Series",
-    banner: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80",
-    badge: "3 Episodes • Sci-Fi",
-    description: "Futuristic visual effects, cyborg thrillers, and cinematic action.",
-    episodes: [
-      {
-        ep: 1,
-        title: "Ep 1: Tears of Steel (The Awakening)",
-        type: "html5",
-        source: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-        duration: "12:14"
-      },
-      {
-        ep: 2,
-        title: "Ep 2: The Spark (Action Chase)",
-        type: "html5",
-        source: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-        duration: "00:15"
-      },
-      {
-        ep: 3,
-        title: "Ep 3: Elephants Dream (Machine Core)",
-        type: "html5",
-        source: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-        duration: "10:54"
-      }
-    ]
-  },
-  {
-    id: "animated-series",
-    title: "Big Buck Universe: Animated Series",
-    banner: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&q=80",
-    badge: "2 Episodes • Animation",
-    description: "Hilarious adventures of giant bunnies and woodland creatures.",
-    episodes: [
-      {
-        ep: 1,
-        title: "Ep 1: The Forest Rebellion",
-        type: "html5",
-        source: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-        duration: "09:56"
-      },
-      {
-        ep: 2,
-        title: "Ep 2: Escape to the Valley",
-        type: "html5",
-        source: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-        duration: "00:15"
-      }
-    ]
-  },
-  {
-    id: "nature-series",
-    title: "Our Planet: 4K Nature Series (YouTube)",
-    banner: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=600&q=80",
-    badge: "2 Episodes • 4K HDR",
-    description: "Breathtaking landscapes, deep mountain forests, and wild rivers.",
-    episodes: [
-      {
-        ep: 1,
-        title: "Ep 1: Untamed Wilderness 4K",
-        type: "youtube",
-        source: "1ZYbU888YX8",
-        duration: "15:00"
-      },
-      {
-        ep: 2,
-        title: "Ep 2: Oceans & Coral Reefs 4K",
-        type: "youtube",
-        source: "7mP_336rO_k",
-        duration: "12:00"
-      }
-    ]
-  },
-  {
-    id: "lofi-series",
-    title: "Late Night Lo-Fi Sessions (YouTube)",
-    banner: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
-    badge: "2 Episodes • Music & Chill",
-    description: "Soothing beats to relax, study, talk, and vibe together.",
-    episodes: [
-      {
-        ep: 1,
-        title: "Ep 1: Cozy Rain & Midnight Coffee",
-        type: "youtube",
-        source: "jfKfPfyJRdk",
-        duration: "Live"
-      },
-      {
-        ep: 2,
-        title: "Ep 2: Synthwave Cyber Lounge",
-        type: "youtube",
-        source: "4xDzrJKXOOY",
-        duration: "Live"
-      }
-    ]
-  }
-];
-
-// Single Sample Videos list
-const SAMPLE_VIDEOS = [
-  {
-    title: "Big Buck Bunny (HD Animation)",
-    type: "html5",
-    source: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    badge: "MP4 • 1080p",
-    thumbnail: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&q=80"
-  },
-  {
-    title: "Tears of Steel (Sci-Fi Demo)",
-    type: "html5",
-    source: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-    badge: "MP4 • Sci-Fi",
-    thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&q=80"
-  },
-  {
-    title: "For Bigger Blazes (Action 4K)",
-    type: "html5",
-    source: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    badge: "MP4 • Action",
-    thumbnail: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=400&q=80"
-  },
-  {
-    title: "Lofi Hip Hop - Chill Beats",
-    type: "youtube",
-    source: "jfKfPfyJRdk",
-    badge: "YouTube • Music",
-    thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80"
-  },
-  {
-    title: "Nature 4K Relaxation",
-    type: "youtube",
-    source: "1ZYbU888YX8",
-    badge: "YouTube • 4K HDR",
-    thumbnail: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=80"
-  }
-];
-
 function parseVideoSource(input) {
-  if (!input || typeof input !== "string") {
-    return SAMPLE_VIDEOS[0];
+  if (!input || typeof input !== "string" || input.trim() === "") {
+    return {
+      type: null,
+      source: null,
+      title: "Waiting for video link or screen share"
+    };
   }
   input = input.trim();
 
@@ -192,7 +54,7 @@ function parseVideoSource(input) {
     input.startsWith("http://") ||
     input.startsWith("https://")
   ) {
-    const filename = input.split("/").pop().split("?")[0] || "Custom Stream";
+    const filename = input.split("/").pop().split("?")[0] || "Direct Stream";
     return {
       type: "html5",
       source: input,
@@ -201,7 +63,11 @@ function parseVideoSource(input) {
   }
 
   // Default fallback
-  return SAMPLE_VIDEOS[0];
+  return {
+    type: "html5",
+    source: input,
+    title: "Direct Stream"
+  };
 }
 
 // In-Memory Room State Store
@@ -210,19 +76,13 @@ const rooms = new Map();
 function getOrCreateRoom(roomId) {
   roomId = (roomId || "default-room").toLowerCase().trim();
   if (!rooms.has(roomId)) {
-    const initialSeries = WEB_SERIES[0];
-    const initialEp = initialSeries.episodes[0];
-
     const room = {
       id: roomId,
       users: new Map(), // socketId -> { id, name, isHost, cam: true, mic: true }
-      currentSeries: initialSeries,
-      playlist: [...initialSeries.episodes],
-      currentEpisodeIndex: 0,
       video: {
-        type: initialEp.type,
-        source: initialEp.source,
-        title: initialEp.title,
+        type: null,
+        source: null,
+        title: "Waiting for video link or screen share",
         state: "paused", // 'playing' | 'paused'
         currentTime: 0,
         lastUpdated: Date.now(),
@@ -234,7 +94,7 @@ function getOrCreateRoom(roomId) {
 
     // Periodic synchronization heartbeat to eliminate drift
     room.heartbeatTimer = setInterval(() => {
-      if (room.users.size > 0 && room.video.state === "playing") {
+      if (room.users.size > 0 && room.video.state === "playing" && room.video.source) {
         const calculatedTime = getRoomCurrentTime(room);
         io.to(roomId).emit("sync-heartbeat", {
           currentTime: calculatedTime,
@@ -271,7 +131,7 @@ app.use(methodOverride("_method"));
 // Routes
 // 1. Landing / Lobby page
 app.get("/", (req, res) => {
-  res.render("lobby.ejs", { sampleVideos: SAMPLE_VIDEOS, webSeries: WEB_SERIES });
+  res.render("lobby.ejs");
 });
 
 // Backward compatibility for /video & /home
@@ -317,21 +177,8 @@ app.get("/room/:roomId", (req, res) => {
   res.render("room.ejs", {
     roomId,
     initialUserName: userName,
-    video: room.video,
-    sampleVideos: SAMPLE_VIDEOS,
-    webSeries: WEB_SERIES,
-    playlist: room.playlist,
-    currentEpisodeIndex: room.currentEpisodeIndex
+    video: room.video
   });
-});
-
-// API endpoints
-app.get("/api/samples", (req, res) => {
-  res.json(SAMPLE_VIDEOS);
-});
-
-app.get("/api/series", (req, res) => {
-  res.json(WEB_SERIES);
 });
 
 // Socket.IO Real-time Synchronization & WebRTC Signaling
@@ -369,10 +216,6 @@ io.on("connection", (socket) => {
       yourId: socket.id,
       isHost,
       users: userList,
-      playlist: room.playlist,
-      currentEpisodeIndex: room.currentEpisodeIndex,
-      currentSeries: room.currentSeries,
-      webSeries: WEB_SERIES,
       video: {
         type: room.video.type,
         source: room.video.source,
@@ -516,156 +359,7 @@ io.on("connection", (socket) => {
     io.to(currentRoomId).emit("chat-message", changeMsg);
   });
 
-  // ==========================================
-  // Web Series & Episodes Handlers
-  // ==========================================
-
-  // Select an episode in the active series
-  socket.on("episode-select", ({ index }) => {
-    if (!currentRoomId) return;
-    const room = getOrCreateRoom(currentRoomId);
-
-    if (room.playlist && room.playlist[index]) {
-      room.currentEpisodeIndex = index;
-      const ep = room.playlist[index];
-
-      room.video.type = ep.type;
-      room.video.source = ep.source;
-      room.video.title = ep.title;
-      room.video.currentTime = 0;
-      room.video.state = "paused";
-      room.video.lastUpdated = Date.now();
-
-      io.to(currentRoomId).emit("episode-change", {
-        index,
-        video: {
-          type: room.video.type,
-          source: room.video.source,
-          title: room.video.title,
-          state: room.video.state,
-          currentTime: 0,
-          playbackRate: room.video.playbackRate,
-          serverTime: Date.now()
-        },
-        sender: currentUserName
-      });
-
-      const epMsg = {
-        id: "sys-" + Date.now(),
-        sender: "System",
-        text: `🎬 ${currentUserName} selected "${ep.title}"`,
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        isSystem: true
-      };
-      room.messages.push(epMsg);
-      io.to(currentRoomId).emit("chat-message", epMsg);
-    }
-  });
-
-  // Next Episode
-  socket.on("episode-next", () => {
-    if (!currentRoomId) return;
-    const room = getOrCreateRoom(currentRoomId);
-    const nextIdx = (room.currentEpisodeIndex || 0) + 1;
-
-    if (room.playlist && nextIdx < room.playlist.length) {
-      room.currentEpisodeIndex = nextIdx;
-      const ep = room.playlist[nextIdx];
-
-      room.video.type = ep.type;
-      room.video.source = ep.source;
-      room.video.title = ep.title;
-      room.video.currentTime = 0;
-      room.video.state = "playing"; // Auto-play next episode
-      room.video.lastUpdated = Date.now();
-
-      io.to(currentRoomId).emit("episode-change", {
-        index: nextIdx,
-        video: {
-          type: room.video.type,
-          source: room.video.source,
-          title: room.video.title,
-          state: room.video.state,
-          currentTime: 0,
-          playbackRate: room.video.playbackRate,
-          serverTime: Date.now()
-        },
-        sender: currentUserName
-      });
-    }
-  });
-
-  // Previous Episode
-  socket.on("episode-prev", () => {
-    if (!currentRoomId) return;
-    const room = getOrCreateRoom(currentRoomId);
-    const prevIdx = (room.currentEpisodeIndex || 0) - 1;
-
-    if (room.playlist && prevIdx >= 0) {
-      room.currentEpisodeIndex = prevIdx;
-      const ep = room.playlist[prevIdx];
-
-      room.video.type = ep.type;
-      room.video.source = ep.source;
-      room.video.title = ep.title;
-      room.video.currentTime = 0;
-      room.video.state = "paused";
-      room.video.lastUpdated = Date.now();
-
-      io.to(currentRoomId).emit("episode-change", {
-        index: prevIdx,
-        video: {
-          type: room.video.type,
-          source: room.video.source,
-          title: room.video.title,
-          state: room.video.state,
-          currentTime: 0,
-          playbackRate: room.video.playbackRate,
-          serverTime: Date.now()
-        },
-        sender: currentUserName
-      });
-    }
-  });
-
-  // Switch Web Series
-  socket.on("series-select", ({ seriesId }) => {
-    if (!currentRoomId) return;
-    const room = getOrCreateRoom(currentRoomId);
-    const targetSeries = WEB_SERIES.find((s) => s.id === seriesId);
-
-    if (targetSeries) {
-      room.currentSeries = targetSeries;
-      room.playlist = [...targetSeries.episodes];
-      room.currentEpisodeIndex = 0;
-      const firstEp = targetSeries.episodes[0];
-
-      room.video.type = firstEp.type;
-      room.video.source = firstEp.source;
-      room.video.title = firstEp.title;
-      room.video.currentTime = 0;
-      room.video.state = "paused";
-      room.video.lastUpdated = Date.now();
-
-      io.to(currentRoomId).emit("series-changed", {
-        series: targetSeries,
-        playlist: room.playlist,
-        currentEpisodeIndex: 0,
-        video: {
-          type: room.video.type,
-          source: room.video.source,
-          title: room.video.title,
-          state: room.video.state,
-          currentTime: 0,
-          playbackRate: room.video.playbackRate,
-          serverTime: Date.now()
-        },
-        sender: currentUserName
-      });
-    }
-  });
-
-  // Local File Synchronized Announce (when watching downloaded series file)
+  // Local File Synchronized Announce (when watching downloaded video file)
   socket.on("local-file-announce", ({ fileName, fileSize }) => {
     if (!currentRoomId) return;
     const room = getOrCreateRoom(currentRoomId);
@@ -752,6 +446,15 @@ io.on("connection", (socket) => {
         candidate
       });
     }
+  });
+
+  socket.on("peer-speaking", ({ speaking }) => {
+    if (!currentRoomId) return;
+    socket.to(currentRoomId).emit("peer-speaking", {
+      speaking: !!speaking,
+      userId: socket.id,
+      userName: currentUserName
+    });
   });
 
   socket.on("screen-share-status", ({ isSharing, streamId }) => {

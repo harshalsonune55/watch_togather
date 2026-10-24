@@ -23,9 +23,9 @@
 
     <div class="finsage-nav-links">
       <a href="#about" class="finsage-nav-link active">About us</a>
-      <a href="#series" class="finsage-nav-link">Web Series</a>
-      <a href="#features" class="finsage-nav-link">Features</a>
-      <a href="#sync" class="finsage-nav-link">Sync Engine</a>
+      <a href="#joinForm" class="finsage-nav-link">Direct Link</a>
+      <a href="#joinForm" class="finsage-nav-link">Screen Share</a>
+      <a href="#joinForm" class="finsage-nav-link">Sync Engine</a>
     </div>
 
     <a href="#joinForm" class="btn-mint-pill">
@@ -47,14 +47,14 @@
 
       <div class="hero-right-side">
         <p class="hero-description">
-          Our all-in-one platform synchronizes movies, YouTube, and web series with microsecond accuracy while keeping a crystal-clear 2-way video call live with your partner.
+          Paste any YouTube or direct video link to synchronize playback with zero drift, or share your screen directly in theater mode while enjoying a crystal-clear 2-way video call.
         </p>
         <div class="hero-actions">
           <a href="#joinForm" class="btn-mint-pill" style="padding: 12px 24px;">
-            <span>↗ Get started</span>
+            <span>↗ Enter Theater</span>
           </a>
-          <a href="#series" class="btn-glass-pill" style="padding: 12px 24px;">
-            <span>View series ▷</span>
+          <a href="#joinForm" class="btn-glass-pill" style="padding: 12px 24px;">
+            <span>Direct Link or Screen Share ▷</span>
           </a>
         </div>
       </div>
@@ -115,7 +115,7 @@
 
         <div>
           <h2 class="bento-form-title">Enter Your Watch Party</h2>
-          <p class="bento-form-sub">Pick your name, choose a series or paste any YouTube URL to begin watching together.</p>
+          <p class="bento-form-sub">Provide your direct video link (YouTube / MP4) or enter the room to share your screen directly.</p>
 
           <form action="/video" method="POST">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
@@ -130,21 +130,12 @@
               </div>
             </div>
 
-            <div>
-              <label class="input-label-clean" for="videoLink">Video or Web Series Link</label>
-              <input type="text" id="videoLink" name="videoLink" class="clean-input-box" placeholder="Paste YouTube link or direct MP4 stream">
-            </div>
-
-            <!-- Instant Series / Demo Selectors -->
-            <div id="series">
-              <label class="input-label-clean">Curated Instant Web Series</label>
-              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 20px;">
-                <% webSeries.forEach(function(s, index) { %>
-                  <div class="sample-card <%= index === 0 ? 'active' : '' %>" data-url="<%= s.episodes[0].source %>" onclick="selectDemoSeries('<%= s.episodes[0].source %>', this)" style="border-radius: var(--radius-sm); padding: 8px 10px; background: var(--bg-surface);">
-                    <div style="font-size: 0.65rem; color: var(--mint); font-weight: 700;"><%= s.badge %></div>
-                    <div style="font-size: 0.8rem; font-weight: 600; color: white;"><%= s.title.split(':')[0] %></div>
-                  </div>
-                <% }); %>
+            <div style="margin-bottom: 20px;">
+              <label class="input-label-clean" for="videoLink">Direct Video Link (Optional)</label>
+              <input type="text" id="videoLink" name="videoLink" class="clean-input-box" placeholder="Paste YouTube link or direct MP4 stream (leave blank to share screen)">
+              <div style="display: flex; gap: 12px; margin-top: 6px; font-size: 0.75rem; color: var(--text-dim);">
+                <span><i class="fa-solid fa-link" style="color: var(--mint); margin-right: 4px;"></i> Direct URL Sync</span>
+                <span><i class="fa-solid fa-desktop" style="color: var(--mint); margin-right: 4px;"></i> 1-Click Screen Share in Room</span>
               </div>
             </div>
 
@@ -205,12 +196,6 @@
     nameInput.addEventListener('input', () => {
       localStorage.setItem('wt_username', nameInput.value.trim());
     });
-
-    function selectDemoSeries(url, cardEl) {
-      document.getElementById('videoLink').value = url;
-      document.querySelectorAll('.sample-card').forEach(c => c.classList.remove('active'));
-      cardEl.classList.add('active');
-    }
 
     function generateRandomRoom() {
       const adjectives = ["cosmic", "neon", "velvet", "stellar", "cinema", "midnight", "crystal", "cyber"];

@@ -3,366 +3,405 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Room: <%= roomId %> • Watch Together</title>
+  <title>WatchTogether • <%= roomId %></title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
-<body>
+<body style="background-color: var(--bg-app); overflow: hidden;">
 
-  <!-- Top App Navigation -->
-  <header class="app-header">
-    <a href="/" class="brand-logo">
-      <div class="brand-icon-box">
-        <i class="fa-solid fa-play"></i>
-      </div>
-      <span>WatchTogether</span>
-      <span class="brand-badge">Room</span>
-    </a>
+  <!-- Virtual Huddle App Layout -->
+  <div class="huddle-app-layout">
 
-    <div class="header-center">
-      <!-- Room Code Pill with 1-click Copy -->
-      <div class="room-badge-pill">
-        <span class="room-code-label">Room:</span>
-        <span class="room-code-val"><%= roomId %></span>
-        <button id="btnCopyLink" class="btn-icon-copy" title="Copy Invite Link">
-          <i class="fa-regular fa-copy"></i>
-        </button>
-      </div>
-
-      <!-- Live Drift & Sync Status Badge -->
-      <div id="syncStatusBadge" class="sync-status-badge paused">
-        <span class="sync-dot"></span>
-        <span id="syncStatusText">Connecting...</span>
-      </div>
-
-      <!-- Current Episode Badge -->
-      <div class="room-badge-pill" style="font-size: 0.8rem; background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.3);">
-        <i class="fa-solid fa-clapperboard" style="color: var(--primary);"></i>
-        <span id="currentEpisodePill">Episode 1</span>
-      </div>
-    </div>
-
-    <div class="header-right">
-      <!-- Participant Count Badge -->
-      <div class="room-badge-pill" style="font-size: 0.8rem;">
-        <i class="fa-solid fa-users" style="color: var(--primary);"></i>
-        <span id="userCountVal">1/2</span>
-      </div>
-
-      <!-- Web Series & Episodes Drawer Button -->
-      <button id="btnOpenSeries" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.82rem;" title="Browse Web Series & Episodes">
-        <i class="fa-solid fa-list-ol"></i> Episodes
-      </button>
-
-      <!-- Change Video Button -->
-      <button id="btnChangeVideo" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.82rem;" title="Change Video Link">
-        <i class="fa-solid fa-film"></i> Video Link
-      </button>
-
-      <!-- Resync Button -->
-      <button id="btnResync" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.82rem;" title="Force alignment with room time">
-        <i class="fa-solid fa-bolt" style="color: var(--warning);"></i> Resync
-      </button>
-    </div>
-  </header>
-
-  <!-- Main Theater Layout -->
-  <div class="theater-layout" id="theaterLayout">
-
-    <!-- Center Stage: Video Player & Custom Media Controls -->
-    <section class="stage-section" id="stageSection">
-      
-      <!-- Video Screen Area -->
-      <div class="video-screen-container">
-        
-        <!-- Stage HUD -->
-        <div class="stage-hud-overlay">
-          <div class="stage-video-title" id="stageVideoTitle"><%= video.title || 'Synchronized Theater' %></div>
-        </div>
-
-        <!-- Big Play Button Overlay -->
-        <div class="play-overlay-btn" id="playOverlayBtn" title="Resume Playback">
-          <i class="fa-solid fa-play" style="margin-left: 4px;"></i>
-        </div>
-
-        <!-- Autoplay Next Episode Banner -->
-        <div class="autoplay-banner" id="autoplayBanner">
-          <span>⏭️ Next episode starts in <strong>5s</strong>...</span>
-        </div>
-
-        <!-- Main Screen Share Stage Display (Screen share appears in the big video section!) -->
-        <div id="screenShareWrapper" class="screen-share-stage-wrapper" style="display: none;">
-          <video id="screenSharePlayer" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain; background: #000;"></video>
-          <div class="stage-screen-banner">
-            <div class="screen-badge">
-              <i class="fa-solid fa-desktop" style="color: var(--accent);"></i>
-              <span id="screenShareOwner">Screen Share Active</span>
-            </div>
-
-            <!-- Single Audio Stream Control: Prevents Dual Audio Echo -->
-            <div class="screen-audio-pill" id="screenAudioPill">
-              <button id="btnToggleScreenAudio" class="btn-icon-screen-audio" title="Toggle Screen Audio">
-                <i class="fa-solid fa-volume-xmark" id="screenAudioIcon"></i>
-              </button>
-              <span id="screenAudioLabel" style="font-size: 0.75rem; color: var(--text-muted);">Single Audio Active</span>
-              <input type="range" id="screenAudioSlider" min="0" max="1" step="0.05" value="1" class="screen-audio-slider" title="Screen Volume">
-            </div>
-
-            <button id="btnStopStageScreen" class="btn btn-secondary" style="display: none; padding: 4px 10px; font-size: 0.75rem;">
-              <i class="fa-solid fa-stop"></i> Stop Sharing
-            </button>
-          </div>
-        </div>
-
-        <!-- YouTube Player Container -->
-        <div id="ytPlayerWrapper" style="width: 100%; height: 100%; display: none;">
-          <div id="ytPlayer"></div>
-        </div>
-
-        <!-- HTML5 Video Player Container -->
-        <video id="html5Player" style="display: none;" playsinline></video>
-      </div>
-
-      <!-- Media Control Dock -->
-      <div class="media-dock">
-        <!-- Scrubber Row -->
-        <div class="scrubber-row">
-          <span class="time-readout" id="timeCurrent">00:00</span>
-          
-          <div class="timeline-progress-bar" id="timelineProgress">
-            <div class="timeline-buffer" id="timelineBuffer"></div>
-            <div class="timeline-current" id="timelineCurrent">
-              <div class="timeline-handle"></div>
-            </div>
-          </div>
-
-          <span class="time-readout" id="timeDuration">00:00</span>
-        </div>
-
-        <!-- Controls Row -->
-        <div class="controls-row">
-          <div class="ctrl-left">
-            <!-- Prev Episode -->
-            <button class="ctrl-btn" id="btnPrevEp" title="Previous Episode (Synced)">
-              <i class="fa-solid fa-backward-step"></i>
-            </button>
-
-            <!-- Play/Pause Button -->
-            <button class="ctrl-btn" id="btnPlayPause" title="Play / Pause (Synced)">
-              <i class="fa-solid fa-play" id="playIcon"></i>
-            </button>
-
-            <!-- Next Episode -->
-            <button class="ctrl-btn" id="btnNextEp" title="Next Episode (Synced)">
-              <i class="fa-solid fa-forward-step"></i>
-            </button>
-
-            <!-- Volume Slider -->
-            <div class="volume-wrapper">
-              <button class="ctrl-btn" id="btnMute" title="Mute Audio">
-                <i class="fa-solid fa-volume-high"></i>
-              </button>
-              <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.05" value="1">
-            </div>
-          </div>
-
-          <div class="ctrl-right">
-            <!-- Playback Speed -->
-            <select class="speed-select" id="speedSelect" title="Playback Speed (Synced)">
-              <option value="0.5">0.5x</option>
-              <option value="0.75">0.75x</option>
-              <option value="1.0" selected>1.0x Normal</option>
-              <option value="1.25">1.25x</option>
-              <option value="1.5">1.5x</option>
-              <option value="2.0">2.0x</option>
-            </select>
-
-            <!-- Cinema Mode (Floating PIP Facecam) -->
-            <button class="ctrl-btn" id="btnCinemaView" title="Toggle Cinema Mode (Floating Facecam)">
-              <i class="fa-solid fa-tv"></i>
-            </button>
-
-            <!-- Fullscreen -->
-            <button class="ctrl-btn" id="btnFullscreen" title="Toggle Fullscreen">
-              <i class="fa-solid fa-expand"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Right Sidebar: WebRTC Video Call & Live Chat -->
-    <aside class="sidebar-section">
-
-      <!-- WebRTC Video Call Grid -->
-      <div class="call-grid" id="mainCallGrid">
-        <!-- Remote Peer Video Tile -->
-        <div class="video-tile" id="remoteTile">
-          <video id="remoteVideo" class="webrtc-stream" autoplay playsinline></video>
-          
-          <!-- Avatar Placeholder when camera is off -->
-          <div class="tile-avatar-placeholder show" id="remotePlaceholder">
-            <div class="avatar-circle">
-              <i class="fa-solid fa-user-group"></i>
-            </div>
-            <span style="font-size: 0.72rem; color: var(--text-dim);">Waiting for friend</span>
-          </div>
-
-          <!-- Tag -->
-          <div class="tile-tag">
-            <i class="fa-solid fa-microphone mic-status-icon" id="remoteMicIcon"></i>
-            <span id="remoteUserName">Friend</span>
-          </div>
-        </div>
-
-        <!-- Local You Video Tile -->
-        <div class="video-tile" id="localTile">
-          <video id="localVideo" class="webrtc-stream" autoplay muted playsinline></video>
-          
-          <!-- Avatar Placeholder when camera is off -->
-          <div class="tile-avatar-placeholder" id="localPlaceholder">
-            <div class="avatar-circle">
-              <i class="fa-solid fa-user"></i>
-            </div>
-            <span style="font-size: 0.72rem; color: var(--text-dim);">Cam Off</span>
-          </div>
-
-          <!-- Tag -->
-          <div class="tile-tag">
-            <i class="fa-solid fa-microphone mic-status-icon" id="localMicIcon"></i>
-            <span>You</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Call Media Action Bar -->
-      <div class="call-actions">
-        <button class="btn-circle-action" id="btnToggleMic" title="Mute / Unmute Microphone">
-          <i class="fa-solid fa-microphone"></i>
-        </button>
-        <button class="btn-circle-action" id="btnToggleCam" title="Turn Camera On / Off">
+    <!-- Left Navigation Sidebar (from Virtual Huddle Image 1) -->
+    <aside class="huddle-sidebar">
+      <!-- Top Brand Logo -->
+      <div class="sidebar-header">
+        <div class="huddle-cam-icon">
           <i class="fa-solid fa-video"></i>
-        </button>
-        <button class="btn-circle-action" id="btnShareScreen" title="Share Screen">
-          <i class="fa-solid fa-desktop"></i>
-        </button>
+        </div>
+        <div>
+          <div class="sidebar-brand-name">WatchTogether</div>
+          <div class="sidebar-brand-sub">Web Conferencing</div>
+        </div>
       </div>
 
-      <!-- Live Chat Container -->
-      <div class="chat-container">
-        <div class="chat-header">
-          <span><i class="fa-solid fa-comments" style="margin-right: 6px; color: var(--primary);"></i>Room Chat</span>
-          <span style="font-size: 0.75rem; color: var(--success);"><i class="fa-solid fa-circle" style="font-size: 0.5rem; margin-right: 4px;"></i>Active</span>
-        </div>
+      <!-- Main Navigation -->
+      <div class="sidebar-nav-section">
+        <ul class="sidebar-menu-list">
+          <li class="sidebar-menu-item active">
+            <div class="menu-item-left">
+              <i class="fa-solid fa-table-cells-large"></i>
+              <span>Dashboard</span>
+            </div>
+          </li>
+          <li class="sidebar-menu-item" id="btnCopyInviteSidebar">
+            <div class="menu-item-left">
+              <i class="fa-regular fa-clone"></i>
+              <span>Copy Invite</span>
+            </div>
+            <i class="fa-solid fa-link" style="font-size: 0.75rem; color: var(--text-dim);"></i>
+          </li>
+        </ul>
+      </div>
 
-        <!-- Messages Feed -->
-        <div class="messages-list" id="messagesList"></div>
+      <!-- SERIES & EPISODES (COURSES in image) -->
+      <div class="sidebar-nav-section">
+        <div class="sidebar-section-title">SERIES & PLAYLISTS</div>
+        <ul class="sidebar-menu-list">
+          <% webSeries.forEach(function(s, idx) { %>
+            <li class="sidebar-menu-item sidebar-series-select <%= idx === 0 ? 'active' : '' %>" data-series-id="<%= s.id %>">
+              <div class="menu-item-left">
+                <i class="fa-regular fa-folder"></i>
+                <span style="max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= s.title.split(':')[0] %></span>
+              </div>
+              <span class="menu-badge-red"><%= s.episodes.length %></span>
+            </li>
+          <% }); %>
+        </ul>
+      </div>
 
-        <!-- Typing Indicator -->
-        <div class="typing-indicator" id="typingIndicator"></div>
+      <!-- ACTIVITIES -->
+      <div class="sidebar-nav-section">
+        <div class="sidebar-section-title">ACTIVITIES</div>
+        <ul class="sidebar-menu-list">
+          <li class="sidebar-menu-item active" style="background: rgba(255, 255, 255, 0.08);">
+            <div class="menu-item-left">
+              <i class="fa-regular fa-folder-open"></i>
+              <span>Theater Stage</span>
+            </div>
+            <div style="width: 18px; height: 18px; border-radius: 50%; background: var(--blue-action); display: flex; align-items: center; justify-content: center; font-size: 0.55rem; color: white;">●●●</div>
+          </li>
+          <li class="sidebar-menu-item" id="btnOpenLocalFile">
+            <div class="menu-item-left">
+              <i class="fa-regular fa-file-video"></i>
+              <span>Local File Sync</span>
+            </div>
+          </li>
+        </ul>
+      </div>
 
-        <!-- Floating Emoji Quick Reaction Bar -->
-        <div class="emoji-bar">
-          <button class="btn-emoji" data-emoji="❤️" title="Love">❤️</button>
-          <button class="btn-emoji" data-emoji="🔥" title="Fire">🔥</button>
-          <button class="btn-emoji" data-emoji="😂" title="Laugh">😂</button>
-          <button class="btn-emoji" data-emoji="🍿" title="Popcorn">🍿</button>
-          <button class="btn-emoji" data-emoji="👏" title="Applause">👏</button>
-          <button class="btn-emoji" data-emoji="🚀" title="Rocket">🚀</button>
-          <button class="btn-emoji" data-emoji="😮" title="Shock">😮</button>
-        </div>
+      <!-- PARTICIPANTS (DIRECT MESSAGES in image) -->
+      <div class="sidebar-nav-section">
+        <div class="sidebar-section-title">PARTICIPANTS</div>
+        <ul class="sidebar-menu-list">
+          <li class="sidebar-menu-item">
+            <div class="menu-item-left">
+              <img class="sidebar-user-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=60&q=80" alt="You">
+              <span id="sidebarUserName">You (Host)</span>
+            </div>
+            <i class="fa-solid fa-circle" style="color: var(--mint); font-size: 0.5rem;"></i>
+          </li>
+          <li class="sidebar-menu-item">
+            <div class="menu-item-left">
+              <img class="sidebar-user-avatar" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&q=80" alt="Friend">
+              <span id="sidebarFriendName">Friend</span>
+            </div>
+            <i class="fa-solid fa-circle" id="sidebarFriendStatusDot" style="color: var(--text-dim); font-size: 0.5rem;"></i>
+          </li>
+        </ul>
+      </div>
 
-        <!-- Message Input -->
-        <div class="chat-input-bar">
-          <input type="text" id="chatInput" class="chat-input-field" placeholder="Send a message..." autocomplete="off">
-          <button id="btnSendChat" class="btn-send-chat" title="Send message">
-            <i class="fa-solid fa-paper-plane" style="font-size: 0.85rem;"></i>
-          </button>
-        </div>
+      <!-- Bottom Settings & Help -->
+      <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
+        <ul class="sidebar-menu-list">
+          <li class="sidebar-menu-item" id="btnOpenVideoModal">
+            <div class="menu-item-left">
+              <i class="fa-solid fa-gear"></i>
+              <span>Video Settings</span>
+            </div>
+          </li>
+          <li class="sidebar-menu-item" id="btnResyncSidebar">
+            <div class="menu-item-left">
+              <i class="fa-solid fa-bolt" style="color: var(--mint);"></i>
+              <span>Resync Engine</span>
+            </div>
+          </li>
+        </ul>
       </div>
     </aside>
-  </div>
 
-  <!-- Floating Picture-in-Picture Facecam (Cinema Mode) -->
-  <div class="floating-pip-container" id="floatingPipContainer">
-    <div class="pip-header">
-      <span><i class="fa-solid fa-video" style="color: var(--accent); margin-right: 4px;"></i>Facecam Sync</span>
-      <span style="color: var(--success);">● Live</span>
-    </div>
-    <div class="pip-grid" id="pipGrid"></div>
-  </div>
+    <!-- Main Conference & Theater View Area -->
+    <main class="huddle-main">
 
-  <!-- Web Series & Episodes Modal -->
-  <div class="modal-backdrop" id="episodesModal">
-    <div class="modal-dialog" style="max-width: 600px;">
-      <div class="modal-header">
-        <h3 class="modal-title"><i class="fa-solid fa-clapperboard" style="color: var(--primary); margin-right: 8px;"></i>Web Series & Episodes</h3>
-        <button class="btn-close-modal" id="btnCloseEpModal">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
+      <!-- Top Room Header (from Virtual Huddle Image 1) -->
+      <header class="huddle-header">
+        <div class="huddle-header-left">
+          <h1 class="huddle-room-title" id="stageVideoTitle"><%= video.title || 'Navigating the path to success.' %></h1>
+          
+          <!-- Participant Avatar Stack (from Virtual Huddle) -->
+          <div class="header-avatar-group">
+            <img class="header-avatar-circle" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=60&q=80" alt="p1">
+            <img class="header-avatar-circle" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&q=80" alt="p2">
+            <img class="header-avatar-circle" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=60&q=80" alt="p3">
+          </div>
+        </div>
+
+        <div class="huddle-header-right">
+          <!-- Recording / Live In-Sync Pill Button (from Virtual Huddle) -->
+          <div class="btn-recording-pill" id="syncStatusBadge">
+            <span class="recording-dot"></span>
+            <span id="syncStatusText">Live Sync</span>
+          </div>
+
+          <!-- User Profile Avatar (from Virtual Huddle) -->
+          <img class="header-avatar-circle" style="width: 32px; height: 32px; margin-left: 6px;" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&q=80" alt="Profile">
+        </div>
+      </header>
+
+      <!-- Video Conference Grid (Matching Image 1: 4 Cards) -->
+      <div class="huddle-grid-container" id="theaterGrid">
+
+        <!-- Card 1: Main Video Player / Screen Share (Top Left or Large) -->
+        <div class="huddle-video-card" id="stageSection" style="grid-column: 1 / 2; grid-row: 1 / 2;">
+          <button class="card-options-btn" id="btnCardMenu1" title="Options">•••</button>
+
+          <!-- YouTube Player -->
+          <div id="ytPlayerWrapper" style="width: 100%; height: 100%; display: none;">
+            <div id="ytPlayer"></div>
+          </div>
+
+          <!-- HTML5 Video Player -->
+          <video id="html5Player" style="display: none; width: 100%; height: 100%; object-fit: contain;" playsinline></video>
+
+          <!-- Big Play Button Overlay -->
+          <div class="play-overlay-btn" id="playOverlayBtn" title="Resume Playback">
+            <i class="fa-solid fa-play" style="margin-left: 4px;"></i>
+          </div>
+
+          <!-- Autoplay Next Episode Banner -->
+          <div class="autoplay-banner" id="autoplayBanner">
+            <span>⏭️ Next episode starts in <strong>5s</strong>...</span>
+          </div>
+
+          <!-- Screen Share Stage Display (When someone shares their screen) -->
+          <div id="screenShareWrapper" class="screen-share-stage-wrapper" style="display: none;">
+            <video id="screenSharePlayer" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain; background: #000;"></video>
+            <div class="stage-screen-banner">
+              <div class="screen-badge">
+                <i class="fa-solid fa-desktop" style="color: var(--mint);"></i>
+                <span id="screenShareOwner">Screen Share Active</span>
+              </div>
+              <button id="btnStopStageScreen" class="btn-mint-pill" style="display: none; padding: 4px 12px; font-size: 0.75rem;">
+                <i class="fa-solid fa-stop"></i> Stop Sharing
+              </button>
+            </div>
+          </div>
+
+          <!-- Pastel Cyan Title Badge (Bottom Left, from Virtual Huddle) -->
+          <div class="pastel-name-pill cyan" id="stageBadge">
+            <i class="fa-solid fa-film"></i>
+            <span id="stageBadgeText"><%= video.title ? video.title.substring(0, 28) : 'Synchronized Video' %></span>
+          </div>
+        </div>
+
+        <!-- Card 2: Remote Friend Webcam (Top Right) -->
+        <div class="huddle-video-card" id="remoteTile" style="grid-column: 2 / 3; grid-row: 1 / 2;">
+          <button class="card-options-btn" title="Options">•••</button>
+          
+          <video id="remoteVideo" class="huddle-stream-video" autoplay playsinline></video>
+
+          <!-- Illustrated Center Avatar Placeholder (from Virtual Huddle Image 1) -->
+          <div class="tile-avatar-placeholder show" id="remotePlaceholder" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #181b24;">
+            <div class="huddle-center-avatar lavender">
+              <i class="fa-solid fa-user-astronaut"></i>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 10px;">Waiting for friend...</div>
+          </div>
+
+          <!-- Pastel Peach Badge (from Virtual Huddle: "Darrell Steward") -->
+          <div class="pastel-name-pill peach">
+            <i class="fa-solid fa-microphone" id="remoteMicIcon" style="font-size: 0.7rem;"></i>
+            <span id="remoteUserName">Darrell Steward</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Local User Webcam (Bottom Left) -->
+        <div class="huddle-video-card" id="localTile" style="grid-column: 1 / 2; grid-row: 2 / 3;">
+          <button class="card-options-btn" title="Options">•••</button>
+
+          <video id="localVideo" class="huddle-stream-video" autoplay muted playsinline></video>
+
+          <!-- Illustrated Center Avatar Placeholder (from Virtual Huddle) -->
+          <div class="tile-avatar-placeholder" id="localPlaceholder" style="position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; background: #181b24;">
+            <div class="huddle-center-avatar mint">
+              <i class="fa-solid fa-user"></i>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 10px;">Camera Off</div>
+          </div>
+
+          <!-- Pastel Coral Badge (from Virtual Huddle: "Bessie Cooper") -->
+          <div class="pastel-name-pill coral">
+            <i class="fa-solid fa-microphone" id="localMicIcon" style="font-size: 0.7rem;"></i>
+            <span id="localUserName">Bessie Cooper (You)</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Web Series Episodes & Playback Queue (Bottom Right) -->
+        <div class="huddle-video-card" id="queueTile" style="grid-column: 2 / 3; grid-row: 2 / 3; padding: 24px; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; overflow-y: auto;">
+          <button class="card-options-btn" id="btnOpenEpModal" title="Series">•••</button>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+            <div style="font-size: 0.85rem; font-weight: 800; color: white;">EPISODES & PLAYLIST</div>
+            <span id="currentEpisodePill" style="font-size: 0.72rem; color: var(--mint); font-weight: 700;">Episode 1</span>
+          </div>
+
+          <!-- Episode quick list items inside card -->
+          <div class="episodes-list" id="episodesListContainer" style="max-height: 180px; overflow-y: auto;"></div>
+
+          <!-- Pastel Mint Badge (from Virtual Huddle: "Esther Howard") -->
+          <div class="pastel-name-pill mint">
+            <i class="fa-solid fa-clapperboard"></i>
+            <span>Esther Howard (Series Queue)</span>
+          </div>
+        </div>
+
       </div>
 
-      <!-- Series Selection Tabs -->
-      <div class="series-select-tabs">
-        <% webSeries.forEach(function(s, idx) { %>
-          <button class="tab-series-btn <%= idx === 0 ? 'active' : '' %>" data-series-id="<%= s.id %>">
-            <%= s.title.split(':')[0] %>
+      <!-- Floating Bottom Control Dock (Exact match of Virtual Huddle Image 1) -->
+      <div class="huddle-bottom-dock-wrapper">
+        
+        <!-- Main Controls Dock Pill -->
+        <div class="huddle-dock">
+          <!-- Hamburger / Drawer Button -->
+          <button class="dock-circle-btn" id="btnToggleSidebar" title="Toggle Navigation">
+            <i class="fa-solid fa-bars"></i>
           </button>
-        <% }); %>
+
+          <!-- Microphone Toggle Button -->
+          <button class="dock-circle-btn" id="btnToggleMic" title="Mute/Unmute Mic">
+            <i class="fa-solid fa-microphone"></i>
+          </button>
+
+          <!-- Camera Toggle Button -->
+          <button class="dock-circle-btn" id="btnToggleCam" title="Turn Camera On/Off">
+            <i class="fa-solid fa-video"></i>
+          </button>
+
+          <!-- Screen Share Button -->
+          <button class="dock-circle-btn" id="btnShareScreen" title="Share Screen in Theater">
+            <i class="fa-solid fa-arrow-up-from-bracket"></i>
+          </button>
+
+          <!-- Resync / Options Button -->
+          <button class="dock-circle-btn" id="btnResync" title="Force Resync">
+            <i class="fa-solid fa-ellipsis"></i>
+          </button>
+
+          <!-- Play / Pause Button -->
+          <button class="dock-circle-btn" id="btnPlayPause" title="Play/Pause">
+            <i class="fa-solid fa-play" id="playIcon"></i>
+          </button>
+
+          <!-- Red End Call Button (from Virtual Huddle) -->
+          <button class="dock-end-call-btn" id="btnLeaveRoom" title="Leave Call" onclick="window.location.href='/'">
+            <i class="fa-solid fa-phone-slash"></i>
+          </button>
+        </div>
+
+        <!-- Chat & Reactions Dock Pill (Bottom Right in Virtual Huddle) -->
+        <div class="huddle-side-dock">
+          <button class="dock-circle-btn" id="btnToggleChat" title="Chat">
+            <i class="fa-regular fa-message"></i>
+          </button>
+          <button class="dock-circle-btn" id="btnOpenReactions" title="Emoji Burst">
+            <i class="fa-regular fa-face-smile"></i>
+          </button>
+        </div>
+
       </div>
 
-      <!-- Episode List Container -->
-      <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase;">Episodes In Series</div>
-      <div class="episodes-list" id="episodesListContainer"></div>
+      <!-- Timeline Scrubber Mini Dock (Floats over stage when scrubbing) -->
+      <div style="position: absolute; bottom: 84px; left: 50%; transform: translateX(-50%); width: min(650px, 90vw); z-index: 90;">
+        <div style="display: flex; align-items: center; gap: 10px; background: rgba(18, 20, 27, 0.85); backdrop-filter: blur(16px); padding: 6px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-subtle);">
+          <span class="time-readout" id="timeCurrent" style="font-size: 0.75rem; color: var(--text-dim); font-family: monospace;">00:00</span>
+          
+          <div class="timeline-progress-bar" id="timelineProgress" style="flex: 1; height: 5px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; cursor: pointer; position: relative;">
+            <div class="timeline-current" id="timelineCurrent" style="height: 100%; width: 0%; background: var(--mint); border-radius: 3px;"></div>
+          </div>
 
-      <!-- Local Video File Sync Option -->
-      <label class="local-file-card" for="inputLocalFile">
-        <i class="fa-solid fa-folder-open" style="font-size: 1.5rem; color: var(--accent); margin-bottom: 6px;"></i>
-        <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">📁 Watch Downloaded Series File</div>
-        <div style="font-size: 0.78rem; color: var(--text-muted);">Select a video file from your laptop. If your friend selects their matching copy, you watch in 100% sync with zero buffering!</div>
-        <input type="file" id="inputLocalFile" accept="video/mp4,video/webm,video/mkv" style="display: none;">
-      </label>
-    </div>
+          <span class="time-readout" id="timeDuration" style="font-size: 0.75rem; color: var(--text-dim); font-family: monospace;">00:00</span>
+          
+          <!-- Speed -->
+          <select class="speed-select" id="speedSelect" style="background: transparent; border: none; color: white; font-size: 0.75rem; font-weight: 700; cursor: pointer; outline: none;">
+            <option value="0.5">0.5x</option>
+            <option value="1.0" selected>1.0x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2.0">2.0x</option>
+          </select>
+        </div>
+      </div>
+
+    </main>
+
   </div>
 
-  <!-- Change Video Modal -->
+  <!-- Slide-Out Chat Drawer (Clean UI) -->
+  <aside class="huddle-chat-drawer" id="chatDrawer">
+    <div class="chat-drawer-header">
+      <div style="font-weight: 800; color: white; font-size: 1rem;"><i class="fa-regular fa-message" style="margin-right: 8px; color: var(--mint);"></i>Room Chat</div>
+      <button class="btn-close-drawer" id="btnCloseChatDrawer">✕</button>
+    </div>
+
+    <!-- Messages List -->
+    <div class="messages-list" id="messagesList" style="flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;"></div>
+
+    <!-- Typing Indicator -->
+    <div class="typing-indicator" id="typingIndicator" style="padding: 4px 16px; font-size: 0.75rem; color: var(--text-dim);"></div>
+
+    <!-- Floating Emoji Reaction Bar -->
+    <div class="emoji-bar" style="padding: 8px 14px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-around;">
+      <button class="btn-emoji" data-emoji="❤️" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">❤️</button>
+      <button class="btn-emoji" data-emoji="🔥" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">🔥</button>
+      <button class="btn-emoji" data-emoji="😂" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">😂</button>
+      <button class="btn-emoji" data-emoji="🍿" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">🍿</button>
+      <button class="btn-emoji" data-emoji="👏" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">👏</button>
+      <button class="btn-emoji" data-emoji="🚀" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">🚀</button>
+    </div>
+
+    <!-- Chat Input -->
+    <div style="padding: 12px 16px; border-top: 1px solid var(--border-subtle); display: flex; gap: 8px;">
+      <input type="text" id="chatInput" class="clean-input-box" placeholder="Type a message..." style="margin-bottom: 0; padding: 10px 14px; font-size: 0.85rem;" autocomplete="off">
+      <button id="btnSendChat" class="btn-mint-pill" style="padding: 10px 14px; font-size: 0.85rem;">
+        <i class="fa-solid fa-paper-plane"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Video Settings / Change Link Modal -->
   <div class="modal-backdrop" id="videoModal">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title"><i class="fa-solid fa-film" style="color: var(--primary); margin-right: 8px;"></i>Load Any Video</h3>
-        <button class="btn-close-modal" id="btnCloseModal">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
+        <h3 class="modal-title">Load Video / Series</h3>
+        <button class="btn-close-drawer" id="btnCloseModal">✕</button>
       </div>
 
       <form id="formLoadVideo">
-        <div class="form-group">
-          <label class="form-label" for="inputVideoUrl">Video URL (YouTube or Direct MP4 / Web Stream)</label>
-          <div class="input-wrapper">
-            <i class="fa-solid fa-link input-icon"></i>
-            <input type="text" id="inputVideoUrl" class="form-input" placeholder="Paste YouTube link or direct video file URL" required>
-          </div>
-        </div>
+        <label class="input-label-clean" for="inputVideoUrl">Video URL (YouTube or Direct MP4 / Web Stream)</label>
+        <input type="text" id="inputVideoUrl" class="clean-input-box" placeholder="Paste YouTube link or direct video file URL" required>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
-          <i class="fa-solid fa-cloud-arrow-up"></i> Load & Sync with Friend
+        <button type="submit" class="btn-mint-pill" style="width: 100%; padding: 12px; margin-top: 6px;">
+          <span>↗ Load & Sync with Partner</span>
         </button>
       </form>
 
       <!-- Instant Samples -->
-      <div class="sample-videos-title">Quick Demos</div>
-      <div class="sample-grid" style="grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));">
+      <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; margin: 20px 0 10px;">Quick Demos</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
         <% sampleVideos.forEach(function(vid) { %>
-          <div class="sample-card modal-sample-card" data-source="<%= vid.source %>" data-title="<%= vid.title %>" data-type="<%= vid.type %>">
-            <span class="sample-badge"><%= vid.badge %></span>
-            <div class="sample-name"><%= vid.title %></div>
+          <div class="sample-card modal-sample-card" data-source="<%= vid.source %>" data-title="<%= vid.title %>" data-type="<%= vid.type %>" style="border-radius: var(--radius-sm); padding: 10px; background: var(--bg-card); cursor: pointer;">
+            <div style="font-size: 0.65rem; color: var(--mint); font-weight: 700;"><%= vid.badge %></div>
+            <div style="font-size: 0.8rem; font-weight: 600; color: white;"><%= vid.title %></div>
           </div>
         <% }); %>
       </div>
     </div>
   </div>
 
-  <!-- Toast Notification -->
+  <!-- Local Video File Input (Hidden) -->
+  <input type="file" id="inputLocalFile" accept="video/mp4,video/webm,video/mkv" style="display: none;">
+
+  <!-- Toast Notice -->
   <div class="toast-notice" id="toastNotice"></div>
 
   <!-- Runtime Config -->
@@ -382,5 +421,55 @@
   <script src="/js/webrtc-call.js"></script>
   <script src="/js/chat-engine.js"></script>
   <script src="/js/room.js"></script>
+
+  <script>
+    // Chat Drawer Toggle
+    const btnToggleChat = document.getElementById('btnToggleChat');
+    const btnCloseChatDrawer = document.getElementById('btnCloseChatDrawer');
+    const chatDrawer = document.getElementById('chatDrawer');
+
+    if (btnToggleChat && chatDrawer) {
+      btnToggleChat.addEventListener('click', () => {
+        chatDrawer.classList.toggle('open');
+      });
+    }
+    if (btnCloseChatDrawer && chatDrawer) {
+      btnCloseChatDrawer.addEventListener('click', () => {
+        chatDrawer.classList.remove('open');
+      });
+    }
+
+    // Toggle Left Sidebar
+    const btnToggleSidebar = document.getElementById('btnToggleSidebar');
+    const sidebar = document.querySelector('.huddle-sidebar');
+    if (btnToggleSidebar && sidebar) {
+      btnToggleSidebar.addEventListener('click', () => {
+        sidebar.style.display = sidebar.style.display === 'none' ? 'flex' : 'none';
+      });
+    }
+
+    // Local File Picker Trigger
+    const btnOpenLocalFile = document.getElementById('btnOpenLocalFile');
+    const inputLocalFile = document.getElementById('inputLocalFile');
+    if (btnOpenLocalFile && inputLocalFile) {
+      btnOpenLocalFile.addEventListener('click', () => {
+        inputLocalFile.click();
+      });
+    }
+
+    // Copy Invite in Sidebar
+    const btnCopyInviteSidebar = document.getElementById('btnCopyInviteSidebar');
+    if (btnCopyInviteSidebar) {
+      btnCopyInviteSidebar.addEventListener('click', () => {
+        navigator.clipboard.writeText(window.location.href);
+        const toast = document.getElementById('toastNotice');
+        if (toast) {
+          toast.textContent = "📋 Invite link copied to clipboard!";
+          toast.classList.add('show');
+          setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+      });
+    }
+  </script>
 </body>
 </html>

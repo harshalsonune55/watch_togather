@@ -516,8 +516,10 @@ class WebRTCCall {
       }
       if (titleEl) {
         if (!this.savedTitle) this.savedTitle = titleEl.textContent;
-        titleEl.innerHTML = `<i class="fa-solid fa-desktop" style="color:var(--accent); margin-right:6px;"></i> ${isSelf ? 'Your Screen Share' : sharerName + "'s Screen Share"}`;
+        titleEl.innerHTML = `<i class="fa-solid fa-desktop" style="color:var(--mint); margin-right:6px;"></i> ${isSelf ? 'Your Screen Share' : sharerName + "'s Screen Share"}`;
       }
+      const stageBadgeText = document.getElementById("stageBadgeText");
+      if (stageBadgeText) stageBadgeText.textContent = "🖥️ Screen Share Active";
 
       this.updateScreenAudioUI(isSelf);
     } else {
@@ -526,6 +528,10 @@ class WebRTCCall {
 
       if (titleEl && this.savedTitle) {
         titleEl.textContent = this.savedTitle;
+      }
+      const stageBadgeText = document.getElementById("stageBadgeText");
+      if (stageBadgeText && this.savedTitle) {
+        stageBadgeText.textContent = this.savedTitle.substring(0, 28);
       }
 
       // Restore active video player in stage

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Room: <%= roomId %> • Watch Together</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+
+  <!-- Top App Navigation -->
+  <header class="app-header">
+    <a href="/" class="brand-logo">
+      <div class="brand-icon-box">
+        <i class="fa-solid fa-play"></i>
+      </div>
+      <span>WatchTogether</span>
+      <span class="brand-badge">Room</span>
+    </a>
+
+    <div class="header-center">
+      <!-- Room Code Pill with 1-click Copy -->
+      <div class="room-badge-pill">
+        <span class="room-code-label">Room:</span>
+        <span class="room-code-val"><%= roomId %></span>
+        <button id="btnCopyLink" class="btn-icon-copy" title="Copy Invite Link">
+          <i class="fa-regular fa-copy"></i>
+        </button>
+      </div>
+
+      <!-- Live Drift & Sync Status Badge -->
+      <div id="syncStatusBadge" class="sync-status-badge paused">
+        <span class="sync-dot"></span>
+        <span id="syncStatusText">Connecting...</span>
+      </div>
+
+      <!-- Current Episode Badge -->
+      <div class="room-badge-pill" style="font-size: 0.8rem; background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.3);">
+        <i class="fa-solid fa-clapperboard" style="color: var(--primary);"></i>
+        <span id="currentEpisodePill">Episode 1</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <!-- Participant Count Badge -->
+      <div class="room-badge-pill" style="font-size: 0.8rem;">
+        <i class="fa-solid fa-users" style="color: var(--primary);"></i>
+        <span id="userCountVal">1/2</span>
+      </div>
+
+      <!-- Web Series & Episodes Drawer Button -->
+      <button id="btnOpenSeries" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.82rem;" title="Browse Web Series & Episodes">
+        <i class="fa-solid fa-list-ol"></i> Episodes
+      </button>
+
+      <!-- Change Video Button -->
+      <button id="btnChangeVideo" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.82rem;" title="Change Video Link">
+        <i class="fa-solid fa-film"></i> Video Link
+      </button>
+
+      <!-- Resync Button -->
+      <button id="btnResync" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.82rem;" title="Force alignment with room time">
+        <i class="fa-solid fa-bolt" style="color: var(--warning);"></i> Resync
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Theater Layout -->
+  <div class="theater-layout" id="theaterLayout">
+
+    <!-- Center Stage: Video Player & Custom Media Controls -->
+    <section class="stage-section" id="stageSection">
+      
+      <!-- Video Screen Area -->
+      <div class="video-screen-container">
+        
+        <!-- Stage HUD -->
+        <div class="stage-hud-overlay">
+          <div class="stage-video-title" id="stageVideoTitle"><%= video.title || 'Synchronized Theater' %></div>
+        </div>
+
+        <!-- Big Play Button Overlay -->
+        <div class="play-overlay-btn" id="playOverlayBtn" title="Resume Playback">
+          <i class="fa-solid fa-play" style="margin-left: 4px;"></i>
+        </div>
+
+        <!-- Autoplay Next Episode Banner -->
+        <div class="autoplay-banner" id="autoplayBanner">
+          <span>⏭️ Next episode starts in <strong>5s</strong>...</span>
+        </div>
+
+        <!-- Main Screen Share Stage Display (Screen share appears in the big video section!) -->
+        <div id="screenShareWrapper" class="screen-share-stage-wrapper" style="display: none;">
+          <video id="screenSharePlayer" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain; background: #000;"></video>
+          <div class="stage-screen-banner">
+            <div class="screen-badge">
+              <i class="fa-solid fa-desktop" style="color: var(--accent);"></i>
+              <span id="screenShareOwner">Screen Share Active</span>
+            </div>
+
+            <!-- Single Audio Stream Control: Prevents Dual Audio Echo -->
+            <div class="screen-audio-pill" id="screenAudioPill">
+              <button id="btnToggleScreenAudio" class="btn-icon-screen-audio" title="Toggle Screen Audio">
+                <i class="fa-solid fa-volume-xmark" id="screenAudioIcon"></i>
+              </button>
+              <span id="screenAudioLabel" style="font-size: 0.75rem; color: var(--text-muted);">Single Audio Active</span>
+              <input type="range" id="screenAudioSlider" min="0" max="1" step="0.05" value="1" class="screen-audio-slider" title="Screen Volume">
+            </div>
+
+            <button id="btnStopStageScreen" class="btn btn-secondary" style="display: none; padding: 4px 10px; font-size: 0.75rem;">
+              <i class="fa-solid fa-stop"></i> Stop Sharing
+            </button>
+          </div>
+        </div>
+
+        <!-- YouTube Player Container -->
+        <div id="ytPlayerWrapper" style="width: 100%; height: 100%; display: none;">
+          <div id="ytPlayer"></div>
+        </div>
+
+        <!-- HTML5 Video Player Container -->
+        <video id="html5Player" style="display: none;" playsinline></video>
+      </div>
+
+      <!-- Media Control Dock -->
+      <div class="media-dock">
+        <!-- Scrubber Row -->
+        <div class="scrubber-row">
+          <span class="time-readout" id="timeCurrent">00:00</span>
+          
+          <div class="timeline-progress-bar" id="timelineProgress">
+            <div class="timeline-buffer" id="timelineBuffer"></div>
+            <div class="timeline-current" id="timelineCurrent">
+              <div class="timeline-handle"></div>
+            </div>
+          </div>
+
+          <span class="time-readout" id="timeDuration">00:00</span>
+        </div>
+
+        <!-- Controls Row -->
+        <div class="controls-row">
+          <div class="ctrl-left">
+            <!-- Prev Episode -->
+            <button class="ctrl-btn" id="btnPrevEp" title="Previous Episode (Synced)">
+              <i class="fa-solid fa-backward-step"></i>
+            </button>
+
+            <!-- Play/Pause Button -->
+            <button class="ctrl-btn" id="btnPlayPause" title="Play / Pause (Synced)">
+              <i class="fa-solid fa-play" id="playIcon"></i>
+            </button>
+
+            <!-- Next Episode -->
+            <button class="ctrl-btn" id="btnNextEp" title="Next Episode (Synced)">
+              <i class="fa-solid fa-forward-step"></i>
+            </button>
+
+            <!-- Volume Slider -->
+            <div class="volume-wrapper">
+              <button class="ctrl-btn" id="btnMute" title="Mute Audio">
+                <i class="fa-solid fa-volume-high"></i>
+              </button>
+              <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.05" value="1">
+            </div>
+          </div>
+
+          <div class="ctrl-right">
+            <!-- Playback Speed -->
+            <select class="speed-select" id="speedSelect" title="Playback Speed (Synced)">
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1.0" selected>1.0x Normal</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2.0">2.0x</option>
+            </select>
+
+            <!-- Cinema Mode (Floating PIP Facecam) -->
+            <button class="ctrl-btn" id="btnCinemaView" title="Toggle Cinema Mode (Floating Facecam)">
+              <i class="fa-solid fa-tv"></i>
+            </button>
+
+            <!-- Fullscreen -->
+            <button class="ctrl-btn" id="btnFullscreen" title="Toggle Fullscreen">
+              <i class="fa-solid fa-expand"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Sidebar: WebRTC Video Call & Live Chat -->
+    <aside class="sidebar-section">
+
+      <!-- WebRTC Video Call Grid -->
+      <div class="call-grid" id="mainCallGrid">
+        <!-- Remote Peer Video Tile -->
+        <div class="video-tile" id="remoteTile">
+          <video id="remoteVideo" class="webrtc-stream" autoplay playsinline></video>
+          
+          <!-- Avatar Placeholder when camera is off -->
+          <div class="tile-avatar-placeholder show" id="remotePlaceholder">
+            <div class="avatar-circle">
+              <i class="fa-solid fa-user-group"></i>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--text-dim);">Waiting for friend</span>
+          </div>
+
+          <!-- Tag -->
+          <div class="tile-tag">
+            <i class="fa-solid fa-microphone mic-status-icon" id="remoteMicIcon"></i>
+            <span id="remoteUserName">Friend</span>
+          </div>
+        </div>
+
+        <!-- Local You Video Tile -->
+        <div class="video-tile" id="localTile">
+          <video id="localVideo" class="webrtc-stream" autoplay muted playsinline></video>
+          
+          <!-- Avatar Placeholder when camera is off -->
+          <div class="tile-avatar-placeholder" id="localPlaceholder">
+            <div class="avatar-circle">
+              <i class="fa-solid fa-user"></i>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--text-dim);">Cam Off</span>
+          </div>
+
+          <!-- Tag -->
+          <div class="tile-tag">
+            <i class="fa-solid fa-microphone mic-status-icon" id="localMicIcon"></i>
+            <span>You</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Call Media Action Bar -->
+      <div class="call-actions">
+        <button class="btn-circle-action" id="btnToggleMic" title="Mute / Unmute Microphone">
+          <i class="fa-solid fa-microphone"></i>
+        </button>
+        <button class="btn-circle-action" id="btnToggleCam" title="Turn Camera On / Off">
+          <i class="fa-solid fa-video"></i>
+        </button>
+        <button class="btn-circle-action" id="btnShareScreen" title="Share Screen">
+          <i class="fa-solid fa-desktop"></i>
+        </button>
+      </div>
+
+      <!-- Live Chat Container -->
+      <div class="chat-container">
+        <div class="chat-header">
+          <span><i class="fa-solid fa-comments" style="margin-right: 6px; color: var(--primary);"></i>Room Chat</span>
+          <span style="font-size: 0.75rem; color: var(--success);"><i class="fa-solid fa-circle" style="font-size: 0.5rem; margin-right: 4px;"></i>Active</span>
+        </div>
+
+        <!-- Messages Feed -->
+        <div class="messages-list" id="messagesList"></div>
+
+        <!-- Typing Indicator -->
+        <div class="typing-indicator" id="typingIndicator"></div>
+
+        <!-- Floating Emoji Quick Reaction Bar -->
+        <div class="emoji-bar">
+          <button class="btn-emoji" data-emoji="❤️" title="Love">❤️</button>
+          <button class="btn-emoji" data-emoji="🔥" title="Fire">🔥</button>
+          <button class="btn-emoji" data-emoji="😂" title="Laugh">😂</button>
+          <button class="btn-emoji" data-emoji="🍿" title="Popcorn">🍿</button>
+          <button class="btn-emoji" data-emoji="👏" title="Applause">👏</button>
+          <button class="btn-emoji" data-emoji="🚀" title="Rocket">🚀</button>
+          <button class="btn-emoji" data-emoji="😮" title="Shock">😮</button>
+        </div>
+
+        <!-- Message Input -->
+        <div class="chat-input-bar">
+          <input type="text" id="chatInput" class="chat-input-field" placeholder="Send a message..." autocomplete="off">
+          <button id="btnSendChat" class="btn-send-chat" title="Send message">
+            <i class="fa-solid fa-paper-plane" style="font-size: 0.85rem;"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Floating Picture-in-Picture Facecam (Cinema Mode) -->
+  <div class="floating-pip-container" id="floatingPipContainer">
+    <div class="pip-header">
+      <span><i class="fa-solid fa-video" style="color: var(--accent); margin-right: 4px;"></i>Facecam Sync</span>
+      <span style="color: var(--success);">● Live</span>
+    </div>
+    <div class="pip-grid" id="pipGrid"></div>
+  </div>
+
+  <!-- Web Series & Episodes Modal -->
+  <div class="modal-backdrop" id="episodesModal">
+    <div class="modal-dialog" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-clapperboard" style="color: var(--primary); margin-right: 8px;"></i>Web Series & Episodes</h3>
+        <button class="btn-close-modal" id="btnCloseEpModal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Series Selection Tabs -->
+      <div class="series-select-tabs">
+        <% webSeries.forEach(function(s, idx) { %>
+          <button class="tab-series-btn <%= idx === 0 ? 'active' : '' %>" data-series-id="<%= s.id %>">
+            <%= s.title.split(':')[0] %>
+          </button>
+        <% }); %>
+      </div>
+
+      <!-- Episode List Container -->
+      <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase;">Episodes In Series</div>
+      <div class="episodes-list" id="episodesListContainer"></div>
+
+      <!-- Local Video File Sync Option -->
+      <label class="local-file-card" for="inputLocalFile">
+        <i class="fa-solid fa-folder-open" style="font-size: 1.5rem; color: var(--accent); margin-bottom: 6px;"></i>
+        <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">📁 Watch Downloaded Series File</div>
+        <div style="font-size: 0.78rem; color: var(--text-muted);">Select a video file from your laptop. If your friend selects their matching copy, you watch in 100% sync with zero buffering!</div>
+        <input type="file" id="inputLocalFile" accept="video/mp4,video/webm,video/mkv" style="display: none;">
+      </label>
+    </div>
+  </div>
+
+  <!-- Change Video Modal -->
+  <div class="modal-backdrop" id="videoModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-film" style="color: var(--primary); margin-right: 8px;"></i>Load Any Video</h3>
+        <button class="btn-close-modal" id="btnCloseModal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formLoadVideo">
+        <div class="form-group">
+          <label class="form-label" for="inputVideoUrl">Video URL (YouTube or Direct MP4 / Web Stream)</label>
+          <div class="input-wrapper">
+            <i class="fa-solid fa-link input-icon"></i>
+            <input type="text" id="inputVideoUrl" class="form-input" placeholder="Paste YouTube link or direct video file URL" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Load & Sync with Friend
+        </button>
+      </form>
+
+      <!-- Instant Samples -->
+      <div class="sample-videos-title">Quick Demos</div>
+      <div class="sample-grid" style="grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));">
+        <% sampleVideos.forEach(function(vid) { %>
+          <div class="sample-card modal-sample-card" data-source="<%= vid.source %>" data-title="<%= vid.title %>" data-type="<%= vid.type %>">
+            <span class="sample-badge"><%= vid.badge %></span>
+            <div class="sample-name"><%= vid.title %></div>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast-notice" id="toastNotice"></div>
+
+  <!-- Runtime Config -->
+  <script>
+    window.ROOM_CONFIG = {
+      roomId: "<%= roomId %>",
+      userName: "<%= initialUserName %>"
+    };
+  </script>
+
+  <!-- External Libraries -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="/socket.io/socket.io.js"></script>
+
+  <!-- Watch Together Modular Engines -->
+  <script src="/js/sync-engine.js"></script>
+  <script src="/js/webrtc-call.js"></script>
+  <script src="/js/chat-engine.js"></script>
+  <script src="/js/room.js"></script>
+</body>
+</html>

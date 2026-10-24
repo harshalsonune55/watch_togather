@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watch Together - Synchronized Web Series, YouTube & Video Call</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+
+  <!-- Top App Navigation -->
+  <header class="app-header">
+    <a href="/" class="brand-logo">
+      <div class="brand-icon-box">
+        <i class="fa-solid fa-play"></i>
+      </div>
+      <span>WatchTogether</span>
+      <span class="brand-badge">Sync HD</span>
+    </a>
+    <div class="header-right">
+      <span style="font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-signal" style="color: var(--success); margin-right: 6px;"></i>Zero-Drift WebRTC</span>
+    </div>
+  </header>
+
+  <!-- Main Lobby Section -->
+  <main class="lobby-container">
+    <div class="hero-header">
+      <div class="hero-tag">
+        <i class="fa-solid fa-bolt"></i> Low-Latency Synchronized Theater
+      </div>
+      <h1 class="hero-title">Watch Web Series & YouTube Together</h1>
+      <p class="hero-subtitle">
+        Crystal-clear 2-way video call, synchronized playback with zero latency drift, episode playlists, and live chat with your partner.
+      </p>
+    </div>
+
+    <div class="lobby-grid">
+      <!-- Create or Join Form -->
+      <div class="lobby-card">
+        <form action="/video" method="POST" id="joinForm">
+          <div class="form-group">
+            <label class="form-label" for="displayName">Your Display Name</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-user input-icon"></i>
+              <input type="text" id="displayName" name="displayName" class="form-input" placeholder="Enter your nickname" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="roomId">Room Code / ID</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-door-open input-icon"></i>
+              <input type="text" id="roomId" name="roomId" class="form-input" placeholder="e.g. cinema-night (or leave blank to create new)">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="videoLink">Initial Video URL (YouTube, MP4, or Web Series link)</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-film input-icon"></i>
+              <input type="text" id="videoLink" name="videoLink" class="form-input" placeholder="Paste YouTube link or direct video stream (optional)">
+            </div>
+          </div>
+
+          <!-- Quick Sample Videos -->
+          <div class="sample-videos-title">Or Pick an Instant Demo Video / Series</div>
+          <div class="sample-grid">
+            <% sampleVideos.forEach(function(vid, index) { %>
+              <div class="sample-card <%= index === 0 ? 'active' : '' %>" data-url="<%= vid.source %>" onclick="selectSampleVideo('<%= vid.source %>', this)">
+                <span class="sample-badge"><%= vid.badge %></span>
+                <div class="sample-name"><%= vid.title %></div>
+              </div>
+            <% }); %>
+          </div>
+
+          <div style="margin-top: 28px; display: flex; gap: 12px;">
+            <button type="submit" class="btn btn-primary" style="flex: 1; padding: 14px;">
+              <i class="fa-solid fa-circle-play"></i> Enter Theater
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="generateRandomRoom()" title="Generate Random Room ID">
+              <i class="fa-solid fa-shuffle"></i> Random Room
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Feature Highlight Column -->
+      <div class="features-panel">
+        <div class="feature-box">
+          <div class="feature-icon-box glow-primary">
+            <i class="fa-solid fa-clapperboard"></i>
+          </div>
+          <div>
+            <div class="feature-title">Web Series & YouTube Playlists</div>
+            <div class="feature-desc">Watch entire web series seasons, queue up episodes, or paste any YouTube video. Auto-plays next episode together in total synchronization!</div>
+          </div>
+        </div>
+
+        <div class="feature-box">
+          <div class="feature-icon-box glow-accent">
+            <i class="fa-solid fa-video"></i>
+          </div>
+          <div>
+            <div class="feature-title">2-Way HD Video Call with Facecam</div>
+            <div class="feature-desc">See and talk to each other in real-time. Features speaking glow indicators, camera/mic toggling, screen sharing, and Cinema Mode floating PIP facecam.</div>
+          </div>
+        </div>
+
+        <div class="feature-box">
+          <div class="feature-icon-box glow-success">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </div>
+          <div>
+            <div class="feature-title">Zero-Drift Microsecond Sync</div>
+            <div class="feature-desc">Play, pause, seek, and scrub in lockstep. Our micro-rate drift correction ensures neither person is even half a second behind.</div>
+          </div>
+        </div>
+
+        <div class="feature-box">
+          <div class="feature-icon-box" style="background: rgba(245, 158, 11, 0.15); color: var(--warning);">
+            <i class="fa-solid fa-folder-open"></i>
+          </div>
+          <div>
+            <div class="feature-title">Sync Downloaded Local Series</div>
+            <div class="feature-desc">Both have a web series downloaded locally on your laptop? Select the file to sync playback with 1080p/4K bitrate and zero network buffering!</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const nameInput = document.getElementById('displayName');
+    const savedName = localStorage.getItem('wt_username');
+    if (savedName) {
+      nameInput.value = savedName;
+    } else {
+      nameInput.value = "User " + Math.floor(Math.random() * 899 + 100);
+    }
+
+    nameInput.addEventListener('input', () => {
+      localStorage.setItem('wt_username', nameInput.value.trim());
+    });
+
+    function selectSampleVideo(url, cardEl) {
+      document.getElementById('videoLink').value = url;
+      document.querySelectorAll('.sample-card').forEach(c => c.classList.remove('active'));
+      cardEl.classList.add('active');
+    }
+
+    function generateRandomRoom() {
+      const adjectives = ["cosmic", "neon", "velvet", "stellar", "cinema", "midnight", "crystal", "cyber"];
+      const nouns = ["wave", "theater", "lounge", "stream", "orbit", "spark", "echo", "pulse"];
+      const randAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+      const randNoun = nouns[Math.floor(Math.random() * nouns.length)];
+      const randNum = Math.floor(Math.random() * 899 + 100);
+      document.getElementById('roomId').value = `${randAdj}-${randNoun}-${randNum}`;
+    }
+  </script>
+</body>
+</html>

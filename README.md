@@ -1,108 +1,66 @@
-# Watch Togather
+# Watch Together 🎬✨
 
-Watch Together is a web application that enables users to synchronize video playback across multiple devices, allowing friends and family to watch videos together in real-time, regardless of their physical location.
+Watch Together is an ultra-modern, real-time synchronized video theater and WebRTC video call platform designed for two people to watch videos together seamlessly with **zero drift, zero noticeable latency, 2-way HD video calling, and live interactive chat**.
 
-## Installation
+---
 
-To run Watch Together on your local machine, follow these steps:
+## ✨ Features
 
-### Prerequisites
-Ensure you have the following tools installed:
+- ⚡ **Zero-Drift Video Synchronization**:
+  - Play, pause, seek, scrub, and speed change (0.5x – 2x) in perfect lockstep.
+  - Precision drift correction algorithm: automatically detects client lag and micro-adjusts playback speed smoothly without audio pops or jarring stutters.
+  - Periodic server clock-offset heartbeats eliminate long-term drift.
+  - Supports both **YouTube** (via official YouTube IFrame API) and **Direct Video Streams** (MP4, WebM, HLS).
+  - Instant curated sample videos (Sci-Fi, Nature 4K, Animation HD, Lofi Beats) for one-click testing.
 
--Node.js: JavaScript runtime environment.
+- 📹 **2-Person HD WebRTC Video & Audio Call**:
+  - Peer-to-peer WebRTC video calling so both persons can see and hear each other while watching.
+  - Dynamic audio speaking indicator: visual glowing aura around the active speaker.
+  - Camera toggle (on/off) with fallback customized user avatar placeholder.
+  - Microphone mute/unmute toggle.
+  - One-click Screen Sharing into the **Main Video Theater Section** so you can share any screen/browser tab while keeping both webcams live in the person view windows!
 
--npm: Node package manager, typically installed alongside Node.js.
+- 💬 **Live Chat & Floating Emoji Bursts**:
+  - Real-time text messaging with sender badges, timestamps, and auto-scroll.
+  - Live typing indicator ("... is typing").
+  - Quick emoji reaction bar (❤️, 🔥, 😂, 🍿, 👏, 🚀, 😮) that spawns physics-animated floating bubbles across both screens.
+  - Pleasant synthesized Web Audio API audio chimes for messages and reactions.
 
+- 💎 **Ultra-Clean Modern Dark Aesthetic**:
+  - Sleek dark slate glassmorphism theme (`backdrop-filter: blur(16px)`).
+  - Clean custom media controls bar with interactive progress scrubber and buffer bar.
+  - 1-click room invite link copying with clipboard toast notifications.
+  - Responsive layout for desktop and tablet screens.
 
-Installation Steps:
+---
 
-1. Clone the repository:
+## 🚀 Quick Start
 
+### 1. Prerequisites
+- Node.js (v18+)
+- npm
 
-```bash
-git clone https://github.com/harshalsonune55/watch_togather.git
-```
-2. Navigate to the project directory:
-```bash
-cd watch_togather
-```
-3. Install dependencies:
-```bash
-npm install
-```
-
-
-## Usage
-To start the application:
-
-1.Run the application:
-
+### 2. Start the Server
 ```bash
 npm start
 ```
-2. Access the application:
+*(By default runs on `http://localhost:8080`. You can configure `PORT=3000` via environment variables).*
 
-Open your web browser and 
-navigate to http://localhost:3000.
+### 3. Open in Browser
+1. Open **[http://localhost:8080](http://localhost:8080)** on your browser.
+2. Enter your display name and click **"Enter Theater"** (or generate a random room code).
+3. Copy the invite link from the top navigation bar and send it to your friend!
+4. When your friend opens the link, the WebRTC video call connects automatically and playback stays in lockstep!
 
-## Deployment
+---
 
-To deploy Watch Together, consider the following tools and platforms:
+## 🛠️ Tech Stack
+- **Backend**: Node.js, Express.js, Socket.IO, EJS Templates
+- **Video Sync Engine**: YouTube IFrame API & HTML5 Video with drift-correction algorithm
+- **Video Call**: WebRTC `RTCPeerConnection`, `getUserMedia`, `getDisplayMedia`, Web Audio API
+- **Styling**: Modern CSS3, Flexbox/Grid, Glassmorphism, FontAwesome 6
 
--Heroku: A cloud platform that supports Node.js applications.
+---
 
--AWS Elastic Beanstalk: A service for deploying and scaling web applications.
-
--DigitalOcean: Provides scalable compute platforms with pre-configured Node.js environments.
-
-Ensure you set the appropriate environment variables and configurations as required by your chosen deployment platform.
-
-## Technologies
-
-The project utilizes the following technologies:
-
-*Node.js: JavaScript runtime for server-side development.
-
-*Express.js: Web framework for Node.js.
-
-*EJS: Embedded JavaScript templating for generating HTML markup.
-
-Socket.io: Enables real-time, bidirectional communication between web clients and servers.
-
-## Contributing
-
-If you'd like to contribute:
-
-1.Fork the repository on GitHub.
-
-2.Create a new branch for your feature or bug fix:
-
-```bash
-git checkout -b feature-name
-```
-
-3.Commit your changes with clear and concise messages.
-
-4.Push your branch to your forked repository:
-```bash
-git push origin feature-name
-```
-5.Submit a pull request to the main repository, detailing your changes and the motivation behind them.
-
-
-
-
-## Documentation
-
-For more detailed information about the project, visit the project's GitHub repository.
-
-## Acknowledgments
-
-Special thanks to the following individuals for their contributions and inspiration:
-
-*Linus Torvalds: Creator of Linux and Git.
-
-*Dan Abramov: Co-author of Redux and Create React App.
-
-## License
-This project is licensed under the MIT License. You are free to use, modify, and distribute this software in accordance with the license terms.
+## 📄 License
+MIT License.

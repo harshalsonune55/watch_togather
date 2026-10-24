@@ -169,7 +169,16 @@ app.set("views", path.join(__dirname, "views"));
 // Serve built React frontend from client/dist if present
 const clientDistPath = path.join(__dirname, "client", "dist");
 if (fs.existsSync(clientDistPath)) {
-  app.use(express.static(clientDistPath));
+  app.use(express.static(clientDistPath, {
+    maxAge: "1d",
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
+        res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+      } else if (filePath.endsWith(".css")) {
+        res.setHeader("Content-Type", "text/css; charset=utf-8");
+      }
+    }
+  }));
 }
 
 app.use(express.static(path.join(__dirname, "public")));
@@ -264,8 +273,18 @@ User Request: ${prompt || 'What did I miss?'}`;
   }
 });
 
-// React SPA Route Handler (Serves React index.html for all page routes)
+// React SPA Route Handler (Serves React index.html for page navigation routes only)
 app.get("*", (req, res, next) => {
+  // Never serve index.html for static asset files, scripts, stylesheets, or API routes
+  if (
+    req.path.startsWith("/api/") ||
+    req.path.startsWith("/assets/") ||
+    req.path.startsWith("/socket.io/") ||
+    /\.[a-zA-Z0-9]+$/.test(req.path)
+  ) {
+    return next();
+  }
+
   const indexPath = path.join(__dirname, "client", "dist", "index.html");
   if (fs.existsSync(indexPath)) {
     return res.sendFile(indexPath);

@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const path = require("path");
+const os = require("os");
 const { Server } = require("socket.io");
 const methodOverride = require("method-override");
 const engine = require("ejs-mate");
@@ -149,6 +150,13 @@ app.post("/video", (req, res) => {
   const name = (req.body.displayName || "User").trim();
   let roomId = (req.body.roomId || "").trim().toLowerCase();
 
+  // If user pasted a full URL or room path into roomId input, extract clean room code:
+  if (roomId.includes("/room/")) {
+    const parts = roomId.split("/room/");
+    roomId = parts[1].split("?")[0].split("#")[0].trim();
+  }
+  roomId = roomId.replace(/^[/]+/, "").split("?")[0].split("#")[0].trim();
+
   if (!roomId) {
     roomId = "watch-" + Math.random().toString(36).substring(2, 8);
   }
@@ -170,14 +178,25 @@ app.post("/video", (req, res) => {
 
 // 2. Direct Watch Together Room page
 app.get("/room/:roomId", (req, res) => {
-  const roomId = req.params.roomId.toLowerCase();
-  const userName = req.query.name || "";
+  let roomId = (req.params.roomId || "default-room").toLowerCase().trim();
+  if (roomId.includes("/room/")) {
+    roomId = roomId.split("/room/")[1].split("?")[0].trim();
+  }
+  roomId = roomId.split("?")[0].split("#")[0].trim();
+
+  const userName = (req.query.name || "").trim();
   const room = getOrCreateRoom(roomId);
 
   res.render("room.ejs", {
     roomId,
     initialUserName: userName,
-    video: room.video
+    video: room.video,
+    sampleVideos: SAMPLE_VIDEOS,
+    webSeries: WEB_SERIES,
+    playlist: room.playlist,
+    currentEpisodeIndex: room.currentEpisodeIndex,
+    networkIp: getLocalIpAddress(),
+    serverPort: port
   });
 });
 
@@ -239,6 +258,7 @@ io.on("connection", (socket) => {
       const otherPeers = Array.from(room.users.keys()).filter((id) => id !== socket.id);
       if (otherPeers.length > 0) {
         socket.emit("initiate-call", { peerId: otherPeers[0] });
+        io.to(otherPeers[0]).emit("peer-ready-to-call", { peerId: socket.id, peerName: userName });
       }
     }
 
@@ -445,6 +465,14 @@ io.on("connection", (socket) => {
         senderId: socket.id,
         candidate
       });
+    }
+  });
+
+  socket.on("signal-reconnect", ({ targetId }) => {
+    if (targetId) {
+      io.to(targetId).emit("signal-reconnect", { senderId: socket.id });
+    } else if (currentRoomId) {
+      socket.to(currentRoomId).emit("signal-reconnect", { senderId: socket.id });
     }
   });
 

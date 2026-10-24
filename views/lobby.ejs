@@ -293,6 +293,23 @@
       localStorage.setItem('wt_username', nameInput.value.trim());
     });
 
+    const roomInput = document.getElementById('roomId');
+    if (roomInput) {
+      roomInput.addEventListener('input', () => {
+        let val = roomInput.value.trim();
+        if (val.includes('/room/')) {
+          val = val.split('/room/')[1].split('?')[0].split('#')[0].trim();
+          roomInput.value = val;
+        }
+      });
+    }
+
+    function selectSampleVideo(url, cardEl) {
+      document.getElementById('videoLink').value = url;
+      document.querySelectorAll('.sample-card').forEach(c => c.classList.remove('active'));
+      cardEl.classList.add('active');
+    }
+
     function generateRandomRoom() {
       const adjectives = ["cosmic", "neon", "velvet", "stellar", "cinema", "midnight", "crystal", "cyber"];
       const nouns = ["wave", "theater", "lounge", "stream", "orbit", "spark", "echo", "pulse"];

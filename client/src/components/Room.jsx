@@ -79,6 +79,7 @@ export default function Room({ roomId, initialName, onNavigate }) {
 
   // Modals & UI Toggles
   const [isCinemaMode, setIsCinemaMode] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [modalVideoUrl, setModalVideoUrl] = useState('');
@@ -763,6 +764,36 @@ export default function Room({ roomId, initialName, onNavigate }) {
     showToast('⚡ Synchronizing with partner...');
   };
 
+  const handleToggleMute = () => {
+    if (html5PlayerRef.current) {
+      html5PlayerRef.current.muted = !isMuted;
+    }
+    setIsMuted(!isMuted);
+  };
+
+  const handleToggleFullscreen = () => {
+    const stageEl = document.getElementById('theaterGrid') || document.querySelector('.huddle-stage-card');
+    if (!stageEl) return;
+    if (!document.fullscreenElement) {
+      stageEl.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  const handleLoadSample = (url, title) => {
+    socketRef.current?.emit('video-change', { source: url, title });
+    setVideo({
+      type: 'html5',
+      source: url,
+      title: title,
+      state: 'paused',
+      currentTime: 0,
+      playbackRate: 1.0
+    });
+    showToast(`🎬 Loaded: ${title}`);
+  };
+
   const handleLoadVideoSubmit = (e) => {
     e.preventDefault();
     if (!modalVideoUrl.trim()) return;
@@ -980,37 +1011,76 @@ export default function Room({ roomId, initialName, onNavigate }) {
         {/* Top Header Bar */}
         <header className="huddle-top-header">
           <div className="header-left-meta">
-            <h1 className="huddle-room-title" style={{ fontSize: '1.2rem', margin: 0 }}>
-              {stageScreenShare.active
-                ? `🖥️ ${stageScreenShare.owner}'s Screen Share`
-                : video.title || 'Navigating the path to success.'}
-            </h1>
-            <div className="huddle-status-pill">
-              <span className="status-dot"></span>
-              <span>{isPlaying ? 'Live In-Sync' : 'Paused'}</span>
+            <div className="header-theater-badge">
+              <i className="fa-solid fa-clapperboard"></i>
+            </div>
+            <div className="header-titles-box">
+              <h1 className="huddle-room-title" title={stageScreenShare.active ? `${stageScreenShare.owner}'s Screen Share` : video.title || 'Ready for Video'}>
+                {stageScreenShare.active
+                  ? `🖥️ ${stageScreenShare.owner}'s Screen Share`
+                  : video.title || 'Watchooo Theater Stage'}
+              </h1>
+              <div className="header-sub-badges">
+                <div className={`huddle-status-pill ${isPlaying ? 'live' : 'paused'}`}>
+                  <span className="status-dot"></span>
+                  <span>{isPlaying ? 'Live In-Sync' : 'Paused'}</span>
+                </div>
+                <button
+                  type="button"
+                  className="room-code-tag-pill"
+                  onClick={() => copyToClipboard(roomId)}
+                  title="Click to copy Room Code"
+                >
+                  <i className="fa-solid fa-key"></i> {roomId}
+                </button>
+              </div>
             </div>
           </div>
 
           <div className="header-right-actions">
             <button
               type="button"
-              className="btn-glass-pill"
+              className="btn-glass-pill btn-ai-sparkle-pill"
               onClick={() => triggerAiCatchUp('Catch me up on what is happening right now')}
-              style={{ background: 'rgba(34, 197, 94, 0.12)', borderColor: 'var(--mint)', color: 'var(--mint)' }}
               title="Watchooo AI Co-Pilot Catch Up"
             >
               <i className="fa-solid fa-wand-magic-sparkles"></i>
               <span>{aiLoading ? 'Thinking...' : 'AI Catch Up'}</span>
             </button>
 
-            <button type="button" className="btn-glass-pill" onClick={handleForceResync}>
+            <button
+              type="button"
+              className="btn-glass-pill"
+              onClick={() => setShowVideoModal(true)}
+              title="Load YouTube URL or MP4 direct link"
+            >
+              <i className="fa-solid fa-link"></i>
+              <span>Load Link</span>
+            </button>
+
+            <button
+              type="button"
+              className={`btn-glass-pill ${isScreenSharing ? 'active-accent' : ''}`}
+              onClick={toggleScreenShare}
+              title="Share your screen to the theater stage"
+            >
+              <i className="fa-solid fa-desktop"></i>
+              <span>{isScreenSharing ? 'Sharing' : 'Share Screen'}</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn-glass-pill"
+              onClick={handleForceResync}
+              title="Force resync video and audio connection"
+            >
               <i className="fa-solid fa-rotate"></i>
-              <span>Force Resync</span>
+              <span>Resync</span>
             </button>
 
             <button type="button" className="btn-mint-pill" onClick={() => setShowShareModal(true)}>
-              <i className="fa-solid fa-share-nodes"></i>
-              <span>Invite Friend</span>
+              <i className="fa-solid fa-user-plus"></i>
+              <span>Invite</span>
             </button>
           </div>
         </header>
@@ -1059,128 +1129,183 @@ export default function Room({ roomId, initialName, onNavigate }) {
               </div>
             ) : (
               <div className="stage-empty-state">
-                <div className="empty-state-icon">
-                  <i className="fa-solid fa-film"></i>
+                <div className="empty-state-visual-ring">
+                  <div className="empty-state-icon">
+                    <i className="fa-solid fa-clapperboard"></i>
+                  </div>
                 </div>
-                <h3 className="empty-state-title">No Video Loaded Yet</h3>
+                <h3 className="empty-state-title">Welcome to Watchooo Theater</h3>
                 <p className="empty-state-desc">
-                  Load any YouTube link, direct MP4 file URL, or broadcast your screen in theater mode!
+                  Enjoy synchronized movie streaming, crystal clear WebRTC video calling, and an AI assistant to catch you up anytime!
                 </p>
-                <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-                  <button type="button" onClick={() => setShowVideoModal(true)} className="btn-mint-pill">
-                    <i className="fa-solid fa-link" style={{ marginRight: '6px' }}></i> Load Video Link
+                <div className="empty-state-actions">
+                  <button type="button" onClick={() => setShowVideoModal(true)} className="btn-mint-pill empty-btn">
+                    <i className="fa-solid fa-link"></i> Load Video Link
                   </button>
-                  <button type="button" onClick={toggleScreenShare} className="btn-glass-pill">
-                    <i className="fa-solid fa-desktop" style={{ marginRight: '6px' }}></i> Share Screen
+                  <button type="button" onClick={toggleScreenShare} className="btn-glass-pill empty-btn">
+                    <i className="fa-solid fa-desktop"></i> Share Screen
+                  </button>
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-glass-pill empty-btn">
+                    <i className="fa-solid fa-folder-open"></i> Local MP4
+                  </button>
+                </div>
+                <div className="empty-state-samples">
+                  <span className="samples-label">Quick Test Streams:</span>
+                  <button
+                    type="button"
+                    className="sample-chip"
+                    onClick={() => handleLoadSample('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 'Big Buck Bunny (4K Animation)')}
+                  >
+                    🐰 Big Buck Bunny
+                  </button>
+                  <button
+                    type="button"
+                    className="sample-chip"
+                    onClick={() => handleLoadSample('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4', 'Tears of Steel (Sci-Fi Short)')}
+                  >
+                    🚀 Tears of Steel
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Stage Floating Action Dock */}
-            <div className="stage-overlay-bottom">
-              <div className="stage-badge-pill">
-                <i className="fa-solid fa-circle-play" style={{ color: 'var(--mint)' }}></i>
-                <span>{video.title?.substring(0, 28) || 'Synchronized Stage'}</span>
-              </div>
+            {/* Stage Floating Action Dock - ONLY shown when media is active */}
+            {(video.source || stageScreenShare.active || duration > 0) && (
+              <div className="stage-overlay-bottom">
+                <div className="stage-overlay-header-row">
+                  <div className="stage-badge-pill" title={video.title}>
+                    <i className="fa-solid fa-circle-play" style={{ color: 'var(--mint)' }}></i>
+                    <span>{video.title || 'Synchronized Stage'}</span>
+                  </div>
+                  <div className="stage-overlay-quick-tools">
+                    <button
+                      type="button"
+                      className="stage-tool-btn"
+                      onClick={handleToggleMute}
+                      title={isMuted ? 'Unmute Player' : 'Mute Player'}
+                    >
+                      <i className={`fa-solid ${isMuted ? 'fa-volume-xmark' : 'fa-volume-high'}`}></i>
+                    </button>
+                    <button
+                      type="button"
+                      className="stage-tool-btn"
+                      onClick={handleToggleFullscreen}
+                      title="Fullscreen Theater"
+                    >
+                      <i className="fa-solid fa-expand"></i>
+                    </button>
+                    <button
+                      type="button"
+                      className={`stage-tool-btn ${isCinemaMode ? 'active' : ''}`}
+                      onClick={() => setIsCinemaMode((prev) => !prev)}
+                      title="Cinema Mode (Toggle Side Panel)"
+                    >
+                      <i className="fa-solid fa-arrows-to-eye"></i>
+                    </button>
+                  </div>
+                </div>
 
-              {/* Scrubber Timeline Bar */}
-              <div className="custom-scrubber-row">
-                <button type="button" onClick={handleTogglePlay} className="btn-scrub-play">
-                  <i className={`fa-solid ${isPlaying ? 'fa-pause' : 'fa-play'}`}></i>
-                </button>
-                <div className="scrubber-track" onClick={handleSeek}>
-                  <div
-                    className="scrubber-fill"
-                    style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
-                  ></div>
+                {/* Scrubber Timeline Bar */}
+                <div className="custom-scrubber-row">
+                  <button type="button" onClick={handleTogglePlay} className="btn-scrub-play" title={isPlaying ? 'Pause' : 'Play'}>
+                    <i className={`fa-solid ${isPlaying ? 'fa-pause' : 'fa-play'}`}></i>
+                  </button>
+                  <div className="scrubber-track" onClick={handleSeek}>
+                    <div
+                      className="scrubber-fill"
+                      style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
+                    ></div>
+                  </div>
+                  <div className="scrubber-time-badge">
+                    {formatTime(currentTime)} / {formatTime(duration)}
+                  </div>
+                  <select
+                    value={playbackRate}
+                    onChange={(e) => handleRateChange(parseFloat(e.target.value))}
+                    className="speed-dropdown-clean"
+                    title="Playback Speed"
+                  >
+                    <option value="0.5">0.5x</option>
+                    <option value="0.75">0.75x</option>
+                    <option value="1">1.0x</option>
+                    <option value="1.25">1.25x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2.0x</option>
+                  </select>
                 </div>
-                <div className="scrubber-time-badge">
-                  {formatTime(currentTime)} / {formatTime(duration)}
-                </div>
-                <select
-                  value={playbackRate}
-                  onChange={(e) => handleRateChange(parseFloat(e.target.value))}
-                  className="speed-dropdown-clean"
-                >
-                  <option value="0.5">0.5x</option>
-                  <option value="0.75">0.75x</option>
-                  <option value="1">1.0x</option>
-                  <option value="1.25">1.25x</option>
-                  <option value="1.5">1.5x</option>
-                  <option value="2">2.0x</option>
-                </select>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* SMALL WINDOWS: Dedicated Side Column for User Profiles & Live Chat */}
+          {/* DEDICATED SIDE COLUMN: 2 Webcams + Controls + Live Chat */}
           <div className="huddle-side-column">
             
-            {/* Small Window 1: Remote Friend Webcam */}
-            <div className={`huddle-video-card huddle-profile-small-card ${isRemoteSpeaking ? 'speaking' : ''}`}>
-              <div className="card-dots-badge" title="Speaking Activity">
-                <span className="speaking-dot d1"></span>
-                <span className="speaking-dot d2"></span>
-                <span className="speaking-dot d3"></span>
-              </div>
-
-              {/* Video Element for Remote Peer Face */}
-              <video
-                ref={remoteVideoRef}
-                className="huddle-stream-video"
-                autoPlay
-                muted
-                playsInline
-              />
-
-              {/* Illustrated Center Avatar Placeholder */}
-              <div className={`tile-avatar-placeholder ${!remoteCamActive || !remotePeerConnected ? 'show' : ''}`}>
-                <div className="huddle-center-avatar lavender">
-                  <i className="fa-solid fa-user-astronaut"></i>
+            {/* 2-Cam Video Grid: Side-by-Side Webcam Tiles */}
+            <div className="huddle-webcams-grid">
+              {/* Small Window 1: Remote Friend Webcam */}
+              <div className={`huddle-video-card huddle-profile-small-card ${isRemoteSpeaking ? 'speaking' : ''}`}>
+                <div className="card-dots-badge" title="Speaking Activity">
+                  <span className="speaking-dot d1"></span>
+                  <span className="speaking-dot d2"></span>
+                  <span className="speaking-dot d3"></span>
                 </div>
-                <div className="tile-placeholder-text">
-                  {!remotePeerConnected ? 'Waiting for friend...' : 'Camera Off'}
+
+                {/* Video Element for Remote Peer Face */}
+                <video
+                  ref={remoteVideoRef}
+                  className="huddle-stream-video"
+                  autoPlay
+                  muted
+                  playsInline
+                />
+
+                {/* Illustrated Center Avatar Placeholder */}
+                <div className={`tile-avatar-placeholder ${!remoteCamActive || !remotePeerConnected ? 'show' : ''}`}>
+                  <div className="huddle-center-avatar lavender">
+                    <i className="fa-solid fa-user-astronaut"></i>
+                  </div>
+                  <div className="tile-placeholder-text">
+                    {!remotePeerConnected ? 'Waiting...' : 'Camera Off'}
+                  </div>
+                </div>
+
+                {/* Friend Profile Badge */}
+                <div className="pastel-name-pill peach small-badge">
+                  <i className={`fa-solid ${remoteMicActive ? 'fa-microphone' : 'fa-microphone-slash muted'}`}></i>
+                  <span>{remotePeerName}</span>
                 </div>
               </div>
 
-              {/* Friend Profile Badge */}
-              <div className="pastel-name-pill peach small-badge">
-                <i className={`fa-solid ${remoteMicActive ? 'fa-microphone' : 'fa-microphone-slash muted'}`}></i>
-                <span>{remotePeerName}</span>
-              </div>
-            </div>
-
-            {/* Small Window 2: Local User Webcam (You) */}
-            <div className={`huddle-video-card huddle-profile-small-card ${isLocalSpeaking ? 'speaking' : ''}`}>
-              <div className="card-dots-badge" title="Speaking Activity">
-                <span className="speaking-dot d1"></span>
-                <span className="speaking-dot d2"></span>
-                <span className="speaking-dot d3"></span>
-              </div>
-
-              {/* Video Element for Local Face Selfie */}
-              <video
-                ref={localVideoRef}
-                className="huddle-stream-video"
-                autoPlay
-                muted
-                playsInline
-                style={{ transform: 'scaleX(-1)' }}
-              />
-
-              {/* Local Avatar Placeholder when Cam is Off */}
-              <div className={`tile-avatar-placeholder ${!isCamOn ? 'show' : ''}`}>
-                <div className="huddle-center-avatar mint">
-                  <i className="fa-solid fa-user"></i>
+              {/* Small Window 2: Local User Webcam (You) */}
+              <div className={`huddle-video-card huddle-profile-small-card ${isLocalSpeaking ? 'speaking' : ''}`}>
+                <div className="card-dots-badge" title="Speaking Activity">
+                  <span className="speaking-dot d1"></span>
+                  <span className="speaking-dot d2"></span>
+                  <span className="speaking-dot d3"></span>
                 </div>
-                <div className="tile-placeholder-text">Camera Off</div>
-              </div>
 
-              {/* Local User Badge */}
-              <div className="pastel-name-pill coral small-badge">
-                <i className={`fa-solid ${isMicOn ? 'fa-microphone' : 'fa-microphone-slash muted'}`}></i>
-                <span>{userName} (You)</span>
+                {/* Video Element for Local Face Selfie */}
+                <video
+                  ref={localVideoRef}
+                  className="huddle-stream-video local-selfie-cam"
+                  autoPlay
+                  muted
+                  playsInline
+                />
+
+                {/* Local Avatar Placeholder when Cam is Off */}
+                <div className={`tile-avatar-placeholder ${!isCamOn ? 'show' : ''}`}>
+                  <div className="huddle-center-avatar mint">
+                    <i className="fa-solid fa-user"></i>
+                  </div>
+                  <div className="tile-placeholder-text">Camera Off</div>
+                </div>
+
+                {/* Local User Badge */}
+                <div className="pastel-name-pill coral small-badge">
+                  <i className={`fa-solid ${isMicOn ? 'fa-microphone' : 'fa-microphone-slash muted'}`}></i>
+                  <span>{userName} (You)</span>
+                </div>
               </div>
             </div>
 
@@ -1189,8 +1314,8 @@ export default function Room({ roomId, initialName, onNavigate }) {
               <button
                 type="button"
                 onClick={toggleMicrophone}
-                className={`control-circle-btn ${!isMicOn ? 'active-danger' : ''}`}
-                title={isMicOn ? 'Mute Mic' : 'Unmute Mic'}
+                className={`control-circle-btn ${!isMicOn ? 'active-danger' : 'active-mic'}`}
+                title={isMicOn ? 'Mute Microphone' : 'Unmute Microphone'}
               >
                 <i className={`fa-solid ${isMicOn ? 'fa-microphone' : 'fa-microphone-slash'}`}></i>
               </button>
@@ -1198,7 +1323,7 @@ export default function Room({ roomId, initialName, onNavigate }) {
               <button
                 type="button"
                 onClick={toggleCamera}
-                className={`control-circle-btn ${!isCamOn ? 'active-danger' : ''}`}
+                className={`control-circle-btn ${!isCamOn ? 'active-danger' : 'active-cam'}`}
                 title={isCamOn ? 'Turn Camera Off' : 'Turn Camera On'}
               >
                 <i className={`fa-solid ${isCamOn ? 'fa-video' : 'fa-video-slash'}`}></i>
@@ -1211,6 +1336,15 @@ export default function Room({ roomId, initialName, onNavigate }) {
                 title="Share Screen to Stage"
               >
                 <i className="fa-solid fa-desktop"></i>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleForceResync}
+                className="control-circle-btn"
+                title="Force Resync"
+              >
+                <i className="fa-solid fa-rotate"></i>
               </button>
 
               <button

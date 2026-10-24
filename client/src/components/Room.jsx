@@ -90,6 +90,8 @@ export default function Room({ roomId, initialName, onNavigate }) {
   const peerConnectionRef = useRef(null);
   const localStreamRef = useRef(null);
   const screenStreamRef = useRef(null);
+  const remoteScreenStreamRef = useRef(null);
+  const remoteScreenStreamIdRef = useRef(null);
   const screenSendersRef = useRef([]);
   const targetPeerIdRef = useRef(null);
   const pendingCandidatesRef = useRef([]);
@@ -100,6 +102,8 @@ export default function Room({ roomId, initialName, onNavigate }) {
   const screenShareVideoRef = useRef(null);
   const html5PlayerRef = useRef(null);
   const ytPlayerRef = useRef(null);
+  const ytIframeRef = useRef(null);
+  const stageScreenShareRef = useRef(stageScreenShare);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -270,6 +274,9 @@ export default function Room({ roomId, initialName, onNavigate }) {
       if (!offer) return;
       targetPeerIdRef.current = senderId;
       if (senderName) setRemotePeerName(senderName);
+      if (isScreenShare && screenStreamId) {
+        remoteScreenStreamIdRef.current = screenStreamId;
+      }
       await initLocalMedia();
       await handleOffer(senderId, offer);
     });
@@ -312,10 +319,18 @@ export default function Room({ roomId, initialName, onNavigate }) {
 
     socket.on('screen-share-status', ({ isSharing, sharerName, streamId }) => {
       if (isSharing) {
+        if (streamId) {
+          remoteScreenStreamIdRef.current = streamId;
+        }
         setStageScreenShare({ active: true, owner: sharerName || 'Friend', isSelf: false });
         pauseLocalPlayer();
       } else {
+        remoteScreenStreamIdRef.current = null;
+        remoteScreenStreamRef.current = null;
         setStageScreenShare({ active: false, owner: '', isSelf: false });
+        if (screenShareVideoRef.current) {
+          screenShareVideoRef.current.srcObject = null;
+        }
       }
     });
 
@@ -340,6 +355,25 @@ export default function Room({ roomId, initialName, onNavigate }) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Keep ref synchronized with state to prevent stale closure bugs in WebRTC ontrack
+  useEffect(() => {
+    stageScreenShareRef.current = stageScreenShare;
+  }, [stageScreenShare]);
+
+  // Ensure active screen share stream is bound immediately to the video element
+  useEffect(() => {
+    if (stageScreenShare.active && screenShareVideoRef.current) {
+      const activeStream = stageScreenShare.isSelf
+        ? screenStreamRef.current
+        : remoteScreenStreamRef.current;
+      if (activeStream && screenShareVideoRef.current.srcObject !== activeStream) {
+        screenShareVideoRef.current.srcObject = activeStream;
+        screenShareVideoRef.current.muted = stageScreenShare.isSelf;
+        screenShareVideoRef.current.play().catch(() => {});
+      }
+    }
+  }, [stageScreenShare.active, stageScreenShare.isSelf]);
 
   // --------------------------------------------------------------------------
   // WebRTC Implementation
@@ -418,15 +452,29 @@ export default function Room({ roomId, initialName, onNavigate }) {
 
     // Remote Track Handler
     pc.ontrack = (event) => {
-      console.log('WebRTC ontrack received:', event.track.kind);
+      console.log('WebRTC ontrack received:', event.track.kind, event.track.id);
       let stream = event.streams && event.streams[0] ? event.streams[0] : null;
       if (!stream) stream = new MediaStream([event.track]);
 
       // Check if this track belongs to screen share
-      if (stageScreenShare.active && stageScreenShare.owner !== 'You') {
+      const isScreenTrack =
+        (remoteScreenStreamIdRef.current && (stream.id === remoteScreenStreamIdRef.current || (event.streams && event.streams.some((s) => s.id === remoteScreenStreamIdRef.current)))) ||
+        (stageScreenShareRef.current.active && stageScreenShareRef.current.owner !== 'You');
+
+      if (isScreenTrack) {
+        console.log('Attaching screen share track to stage');
+        remoteScreenStreamRef.current = stream;
+        setStageScreenShare((prev) => ({
+          active: true,
+          owner: prev.owner && prev.owner !== 'You' ? prev.owner : (remotePeerName || 'Friend'),
+          isSelf: false
+        }));
         if (screenShareVideoRef.current) {
           screenShareVideoRef.current.srcObject = stream;
-          screenShareVideoRef.current.play().catch(() => {});
+          screenShareVideoRef.current.muted = false;
+          screenShareVideoRef.current.play().catch((err) => {
+            console.warn('remote screen share play warning:', err);
+          });
         }
         return;
       }
@@ -694,27 +742,52 @@ export default function Room({ roomId, initialName, onNavigate }) {
   // --------------------------------------------------------------------------
   // Synchronized Player Helpers
   // --------------------------------------------------------------------------
+  const postToYouTubeIframe = (func, args = []) => {
+    if (ytIframeRef.current && ytIframeRef.current.contentWindow) {
+      try {
+        ytIframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func, args }),
+          '*'
+        );
+      } catch (e) {}
+    }
+  };
+
   const playLocalPlayer = () => {
     if (video.type === 'html5' && html5PlayerRef.current) {
-      html5PlayerRef.current.play().catch(() => {});
+      html5PlayerRef.current.play().catch((err) => {
+        console.warn('HTML5 autoplay blocked, muting:', err);
+        if (html5PlayerRef.current) {
+          html5PlayerRef.current.muted = true;
+          html5PlayerRef.current.play().catch(() => {});
+        }
+      });
+    } else if (video.type === 'youtube') {
+      postToYouTubeIframe('playVideo');
     }
   };
 
   const pauseLocalPlayer = () => {
     if (video.type === 'html5' && html5PlayerRef.current) {
       html5PlayerRef.current.pause();
+    } else if (video.type === 'youtube') {
+      postToYouTubeIframe('pauseVideo');
     }
   };
 
   const seekLocalPlayer = (time) => {
     if (video.type === 'html5' && html5PlayerRef.current) {
       html5PlayerRef.current.currentTime = time;
+    } else if (video.type === 'youtube') {
+      postToYouTubeIframe('seekTo', [time, true]);
     }
   };
 
   const setPlayerRate = (rate) => {
     if (video.type === 'html5' && html5PlayerRef.current) {
       html5PlayerRef.current.playbackRate = rate;
+    } else if (video.type === 'youtube') {
+      postToYouTubeIframe('setPlaybackRate', [rate]);
     }
   };
 
@@ -765,10 +838,14 @@ export default function Room({ roomId, initialName, onNavigate }) {
   };
 
   const handleToggleMute = () => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
     if (html5PlayerRef.current) {
-      html5PlayerRef.current.muted = !isMuted;
+      html5PlayerRef.current.muted = nextMuted;
     }
-    setIsMuted(!isMuted);
+    if (video.type === 'youtube') {
+      postToYouTubeIframe(nextMuted ? 'mute' : 'unMute');
+    }
   };
 
   const handleToggleFullscreen = () => {
@@ -1115,43 +1192,83 @@ export default function Room({ roomId, initialName, onNavigate }) {
           {/* BIG WINDOW: Main Video Stage */}
           <div className="huddle-stage-card">
             
-            {/* Screen Share Stage Player */}
-            {stageScreenShare.active ? (
-              <div className="screen-share-stage-wrapper">
-                <video ref={screenShareVideoRef} className="screen-share-video-player" autoPlay playsInline />
-                <div className="screen-share-banner">
-                  <span>🖥️ {stageScreenShare.owner}'s Screen Share Active</span>
-                  {stageScreenShare.isSelf && (
-                    <button type="button" onClick={stopScreenShare} className="btn-danger-pill" style={{ marginLeft: '12px', padding: '4px 10px', fontSize: '0.75rem' }}>
-                      Stop Sharing
-                    </button>
-                  )}
+            {/* Screen Share Stage Player (Kept mounted with display toggle so stream attaches with zero latency) */}
+            <div
+              className="screen-share-stage-wrapper"
+              style={{ display: stageScreenShare.active ? 'flex' : 'none', width: '100%', height: '100%', position: 'absolute', inset: 0, zIndex: 12 }}
+            >
+              <video
+                ref={(el) => {
+                  screenShareVideoRef.current = el;
+                  if (el) {
+                    const activeStream = stageScreenShare.isSelf
+                      ? screenStreamRef.current
+                      : remoteScreenStreamRef.current;
+                    if (activeStream && el.srcObject !== activeStream) {
+                      el.srcObject = activeStream;
+                      el.muted = stageScreenShare.isSelf;
+                      el.play().catch(() => {});
+                    }
+                  }
+                }}
+                className="screen-share-video-player"
+                autoPlay
+                playsInline
+                muted={stageScreenShare.isSelf}
+              />
+              <div className="stage-screen-banner">
+                <div className="screen-badge">
+                  <i className="fa-solid fa-desktop" style={{ color: 'var(--mint)' }}></i>
+                  <span>{stageScreenShare.owner}'s Screen Share Active</span>
                 </div>
+                {stageScreenShare.isSelf && (
+                  <button
+                    type="button"
+                    onClick={stopScreenShare}
+                    className="btn-danger-pill"
+                    style={{ marginLeft: '12px', padding: '4px 10px', fontSize: '0.75rem' }}
+                  >
+                    Stop Sharing
+                  </button>
+                )}
               </div>
-            ) : video.source ? (
+            </div>
+
+            {/* Video Player Display (When not screen sharing) */}
+            {!stageScreenShare.active && video.source ? (
               <div className="video-player-wrapper" style={{ width: '100%', height: '100%', position: 'relative' }}>
                 {video.type === 'youtube' ? (
                   <iframe
+                    ref={ytIframeRef}
+                    id="ytStagePlayer"
                     className="youtube-embed-player"
-                    src={`https://www.youtube.com/embed/${video.source}?enablejsapi=1&autoplay=1&playsinline=1`}
+                    src={`https://www.youtube-nocookie.com/embed/${video.source}?enablejsapi=1&autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
                     title="YouTube video player"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
-                    style={{ width: '100%', height: '100%', border: 'none' }}
+                    style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
                   ></iframe>
                 ) : (
                   <video
                     ref={html5PlayerRef}
+                    key={video.source}
                     src={video.source}
                     className="html5-video-player"
                     playsInline
+                    controls={false}
+                    autoPlay={isPlaying}
                     onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
                     onDurationChange={(e) => setDuration(e.target.duration)}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    onLoadedMetadata={(e) => {
+                      setDuration(e.target.duration);
+                      if (video.currentTime > 0) e.target.currentTime = video.currentTime;
+                      if (isPlaying) e.target.play().catch(() => {});
+                    }}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000000', display: 'block' }}
                   />
                 )}
               </div>
-            ) : (
+            ) : !stageScreenShare.active ? (
               <div className="stage-empty-state">
                 <div className="empty-state-visual-ring">
                   <div className="empty-state-icon">
@@ -1191,7 +1308,7 @@ export default function Room({ roomId, initialName, onNavigate }) {
                   </button>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Stage Floating Action Dock - ONLY shown when media is active */}
             {(video.source || stageScreenShare.active || duration > 0) && (

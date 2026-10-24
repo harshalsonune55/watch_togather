@@ -1,39 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-
-const DEMO_TABS = [
-  {
-    id: 'sync',
-    label: '🎬 Theater Sync',
-    title: 'Zero-Drift Synchronized Movie Theater',
-    desc: 'Watch any movie or YouTube stream in lockstep. Play, pause, seek, and playback rate automatically sync to the exact same frame across all friends.',
-    videoSrc: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-    badgeText: 'Live Stream • 1080p 60fps'
-  },
-  {
-    id: 'ai',
-    label: '✨ Groq AI Assistant',
-    title: 'Instant Scene Recaps for Latecomers',
-    desc: 'Never pause the movie to explain what happened. Watchooo AI analyzes the scene timestamp and chat history to generate a crisp 3-bullet recap on demand.',
-    videoSrc: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    badgeText: '✨ Powered by Groq AI'
-  },
-  {
-    id: 'call',
-    label: '👥 2-Way HD Video Call',
-    title: 'Crystal Clear WebRTC Face-to-Face',
-    desc: 'See every laugh and reaction with HD video calling, animated speaking detection indicators, and synchronized low-latency audio.',
-    videoSrc: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    badgeText: 'WebRTC P2P • Turn Relay'
-  },
-  {
-    id: 'screen',
-    label: '🖥️ Screen Sharing',
-    title: 'Share Any App, Game, or Tab',
-    desc: 'Broadcast browser tabs, Netflix, Discord games, or coding sessions straight to the big theater screen with integrated audio streaming.',
-    videoSrc: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    badgeText: 'Screen Stream • Full Audio'
-  }
-];
+import { Typewriter } from 'motion-plus/react';
 
 const DEMO_VIDEOS = [
   {
@@ -74,31 +40,8 @@ export default function Home({ onNavigate }) {
   const [videoLink, setVideoLink] = useState('');
   const [activeFaq, setActiveFaq] = useState(null);
 
-  // Product Demo Showcase State
-  const [activeDemoTab, setActiveDemoTab] = useState('sync');
-  const [isDemoPlaying, setIsDemoPlaying] = useState(true);
-  const [isDemoMuted, setIsDemoMuted] = useState(true);
-  const demoVideoRef = useRef(null);
-
-  const toggleDemoPlay = () => {
-    if (demoVideoRef.current) {
-      if (isDemoPlaying) {
-        demoVideoRef.current.pause();
-      } else {
-        demoVideoRef.current.play().catch(() => {});
-      }
-      setIsDemoPlaying(!isDemoPlaying);
-    }
-  };
-
-  const toggleDemoMute = () => {
-    if (demoVideoRef.current) {
-      demoVideoRef.current.muted = !isDemoMuted;
-      setIsDemoMuted(!isDemoMuted);
-    }
-  };
-
-  const currentDemo = DEMO_TABS.find((t) => t.id === activeDemoTab) || DEMO_TABS[0];
+  // Active YouTube Demo Preview
+  const [activeYoutubeVideo, setActiveYoutubeVideo] = useState('jfKfPfyJRdk');
 
   useEffect(() => {
     localStorage.setItem('wt_username', displayName);
@@ -167,7 +110,9 @@ export default function Home({ onNavigate }) {
 
         <h1 className="home-hero-title">
           <span className="hero-text-shimmer">Watch Any Video Together.</span><br />
-          <span className="gradient-text hero-text-pulse">In Total Real-Time Sync.</span>
+          <span className="gradient-text hero-text-pulse">
+            <Typewriter speed="normal" variance="natural">In Total Real-Time Sync.</Typewriter>
+          </span>
         </h1>
 
         <p className="home-hero-subtitle">
@@ -252,145 +197,143 @@ export default function Home({ onNavigate }) {
           </p>
         </div>
 
-        {/* Interactive Feature Tabs */}
-        <div className="demo-tabs-bar">
-          {DEMO_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={`demo-tab-btn ${activeDemoTab === tab.id ? 'active' : ''}`}
-              onClick={() => {
-                setActiveDemoTab(tab.id);
-                setIsDemoPlaying(true);
-              }}
-            >
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Cinematic Product Demo Window */}
-        <div className="product-demo-showcase-wrapper">
-          <div className="demo-video-window">
-            {/* macOS Titlebar */}
-            <div className="demo-window-titlebar">
-              <div className="window-dots">
-                <span className="dot-circle red"></span>
-                <span className="dot-circle yellow"></span>
-                <span className="dot-circle green"></span>
-              </div>
-              <div className="window-address-bar">
-                <i className="fa-solid fa-lock" style={{ fontSize: '0.68rem', color: 'var(--mint)' }}></i>
-                <span>watchooo.com/room/{activeDemoTab}-party-demo</span>
-              </div>
-              <div className="window-status-pill">
-                <span className="live-dot-green"></span>
-                <span>In-Sync &bull; 2 Viewers</span>
-              </div>
-            </div>
-
-            {/* Video Stage & Overlays */}
-            <div className="demo-player-stage">
-              <video
-                ref={demoVideoRef}
-                key={currentDemo.videoSrc}
-                src={currentDemo.videoSrc}
-                className="demo-screen-video"
-                autoPlay
-                loop
-                muted={isDemoMuted}
-                playsInline
-                onClick={toggleDemoPlay}
-              />
-
-              {/* Floating AI Sparkle Badge */}
-              <div className="demo-ai-floating-badge">
-                <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--mint)' }}></i>
-                <span>{currentDemo.badgeText}</span>
-              </div>
-
-              {/* Simulated WebRTC PIP Video Calling Window */}
-              <div className="demo-pip-webcam">
-                <div className="demo-pip-header">
-                  <span>LIVE FACECAM</span>
-                  <i className="fa-solid fa-video"></i>
+        {/* 2-Column Showcase: YouTube Video on Left & Product Description on Right */}
+        <div className="demo-showcase-split-grid">
+          {/* Left Column: YouTube Video Embed */}
+          <div className="demo-video-col">
+            <div className="demo-video-card">
+              <div className="demo-window-bar">
+                <div className="window-dots">
+                  <span className="dot-circle red"></span>
+                  <span className="dot-circle yellow"></span>
+                  <span className="dot-circle green"></span>
                 </div>
-                <div className="demo-pip-cams-row">
-                  <div className="demo-pip-avatar speaking">
-                    <i className="fa-solid fa-user-astronaut pip-avatar-icon"></i>
-                    <span className="pip-name-tag">Sam</span>
-                  </div>
-                  <div className="demo-pip-avatar">
-                    <i className="fa-solid fa-user pip-avatar-icon"></i>
-                    <span className="pip-name-tag">You</span>
-                  </div>
+                <div className="demo-video-tag">
+                  <span className="live-dot-green"></span>
+                  <span>YouTube Stream Sync</span>
                 </div>
               </div>
-
-              {/* Simulated Live Room Chat Overlay */}
-              <div className="demo-simulated-chat">
-                <div className="demo-chat-avatar">S</div>
-                <span><strong>Sam:</strong> That scene was incredible! 🔥</span>
+              <div className="demo-video-embed-box">
+                <iframe
+                  className="demo-youtube-iframe"
+                  src={`https://www.youtube-nocookie.com/embed/${activeYoutubeVideo}?enablejsapi=1&rel=0&modestbranding=1`}
+                  title="Watchooo Product Demo Video"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                ></iframe>
               </div>
-
-              {/* Center Play Button Overlay when paused */}
-              {!isDemoPlaying && (
-                <button type="button" onClick={toggleDemoPlay} className="demo-play-center-btn" title="Play Video Demo">
-                  <i className="fa-solid fa-play" style={{ marginLeft: '4px' }}></i>
-                </button>
-              )}
-
-              {/* Video Player Bottom Control Bar */}
-              <div className="demo-window-controls">
-                <button type="button" onClick={toggleDemoPlay} className="demo-ctrl-btn" title={isDemoPlaying ? 'Pause' : 'Play'}>
-                  <i className={`fa-solid ${isDemoPlaying ? 'fa-pause' : 'fa-play'}`}></i>
-                </button>
-
-                <div className="demo-track" onClick={toggleDemoPlay}>
-                  <div className="demo-track-fill"></div>
+              <div className="demo-video-footer">
+                <div className="demo-video-caption">
+                  <i className="fa-brands fa-youtube" style={{ color: '#ef4444' }}></i>
+                  <span>Live 1080p Stream &bull; Low Latency Synced Playback</span>
                 </div>
-
-                <button type="button" onClick={toggleDemoMute} className="demo-ctrl-btn" title={isDemoMuted ? 'Unmute Audio' : 'Mute Audio'}>
-                  <i className={`fa-solid ${isDemoMuted ? 'fa-volume-xmark' : 'fa-volume-high'}`}></i>
-                </button>
-
-                <button type="button" onClick={() => handleLaunchRoom(currentDemo.videoSrc)} className="btn-mint-pill" style={{ padding: '4px 12px', fontSize: '0.74rem' }}>
-                  <span>↗ Launch Live</span>
+                <button
+                  type="button"
+                  onClick={() => handleLaunchRoom(activeYoutubeVideo)}
+                  className="btn-mint-pill"
+                  style={{ padding: '6px 14px', fontSize: '0.78rem' }}
+                >
+                  <span>↗ Open in Theater</span>
                 </button>
               </div>
             </div>
+          </div>
 
-            {/* Bottom Caption Info Banner */}
-            <div className="demo-caption-banner">
-              <div className="demo-caption-text">
-                <h4 className="demo-caption-title">{currentDemo.title}</h4>
-                <p className="demo-caption-sub">{currentDemo.desc}</p>
+          {/* Right Column: Product Description & Highlights */}
+          <div className="demo-description-col">
+            <div className="demo-desc-badge">
+              <i className="fa-solid fa-sparkles" style={{ color: 'var(--mint)' }}></i>
+              <span>Total Real-Time Cinema</span>
+            </div>
+
+            <h3 className="demo-desc-heading">
+              Watch Together Without The Hassle of "3, 2, 1... Play!"
+            </h3>
+
+            <p className="demo-desc-lead">
+              Watchooo brings your movie nights, YouTube streams, and binge sessions into seamless real-time lockstep. No more counting down or asking "what minute are you on?" — every pause, seek, and frame is calibrated with millisecond precision.
+            </p>
+
+            <div className="demo-features-checklist">
+              <div className="checklist-item">
+                <div className="check-icon-circle">
+                  <i className="fa-solid fa-check"></i>
+                </div>
+                <div className="check-text-box">
+                  <h4 className="check-title">Zero-Drift Playback Sync</h4>
+                  <p className="check-desc">Server heartbeat calibration keeps everyone locked to the exact same video frame without audio drift.</p>
+                </div>
               </div>
+
+              <div className="checklist-item">
+                <div className="check-icon-circle">
+                  <i className="fa-solid fa-check"></i>
+                </div>
+                <div className="check-text-box">
+                  <h4 className="check-title">2-Way HD Video &amp; Voice Calling</h4>
+                  <p className="check-desc">See your friends' live facial reactions and hear crisp WebRTC audio with animated speaking wave detection.</p>
+                </div>
+              </div>
+
+              <div className="checklist-item">
+                <div className="check-icon-circle">
+                  <i className="fa-solid fa-check"></i>
+                </div>
+                <div className="check-text-box">
+                  <h4 className="check-title">✨ Groq AI Assistant for Latecomers</h4>
+                  <p className="check-desc">Friends who join late can tap "Catch Up" to receive a crisp 3-bullet scene summary in 300ms without pausing the show.</p>
+                </div>
+              </div>
+
+              <div className="checklist-item">
+                <div className="check-icon-circle">
+                  <i className="fa-solid fa-check"></i>
+                </div>
+                <div className="check-text-box">
+                  <h4 className="check-title">Screen &amp; Tab Audio Sharing</h4>
+                  <p className="check-desc">Broadcast Netflix, Disney+, Anime tabs, or desktop games directly to the big theater screen with integrated audio.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="demo-cta-row">
               <button
                 type="button"
-                onClick={() => handleLaunchRoom(currentDemo.videoSrc)}
-                className="btn-mint-pill"
-                style={{ flexShrink: 0, padding: '10px 18px', fontSize: '0.85rem' }}
+                onClick={() => handleLaunchRoom(activeYoutubeVideo)}
+                className="btn-mint-pill demo-launch-cta-btn"
               >
-                <span>↗ Test in Full Room</span>
+                <span>↗ Launch Synchronized Room</span>
               </button>
+              <a href="#start-party" className="btn-clean-secondary demo-custom-cta-btn">
+                <span>Custom Video Party</span>
+              </a>
             </div>
           </div>
         </div>
 
         {/* 1-Click Ready Demos Grid */}
-        <div style={{ textAlign: 'center', marginTop: '30px', marginBottom: '20px' }}>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', margin: '0 0 6px' }}>
+        <div style={{ textAlign: 'center', marginTop: '48px', marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 6px' }}>
             Instant Pre-Loaded Demo Rooms
           </h3>
-          <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', margin: 0 }}>
-            Click any movie or stream below to spin up a synchronized room immediately:
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: 0 }}>
+            Click any stream below to preview or spin up a synchronized room immediately:
           </p>
         </div>
 
         <div className="demo-cards-grid">
           {DEMO_VIDEOS.map((demo) => (
-            <div key={demo.source} className="demo-card" onClick={() => handleLaunchRoom(demo.source)}>
+            <div
+              key={demo.source}
+              className={`demo-card ${activeYoutubeVideo === demo.source ? 'active-preview-card' : ''}`}
+              onClick={() => {
+                if (demo.type === 'youtube') {
+                  setActiveYoutubeVideo(demo.source);
+                } else {
+                  handleLaunchRoom(demo.source);
+                }
+              }}
+            >
               <div className="demo-card-top">
                 <span className="demo-badge">{demo.badge}</span>
                 <span className="demo-play-icon">▶</span>
@@ -398,7 +341,7 @@ export default function Home({ onNavigate }) {
               <h3 className="demo-title">{demo.title}</h3>
               <p className="demo-desc">{demo.desc}</p>
               <div className="demo-card-footer">
-                <span>Launch in Sync ↗</span>
+                <span>{demo.type === 'youtube' && activeYoutubeVideo === demo.source ? '✓ Previewing Above' : 'Launch in Sync ↗'}</span>
               </div>
             </div>
           ))}

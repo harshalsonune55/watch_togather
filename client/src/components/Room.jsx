@@ -822,6 +822,30 @@ export default function Room({ roomId, initialName, onNavigate }) {
   // --------------------------------------------------------------------------
   // Chat & AI Assistant Helpers
   // --------------------------------------------------------------------------
+  const formatAiMessage = (text) => {
+    if (!text) return '';
+    const lines = text.split('\n');
+    return lines.map((line, lIdx) => {
+      const parts = line.split(/(\*\*.*?\*\*)/g);
+      const renderedParts = parts.map((part, pIdx) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return (
+            <strong key={pIdx} style={{ color: 'var(--mint)', fontWeight: 700 }}>
+              {part.slice(2, -2)}
+            </strong>
+          );
+        }
+        return part;
+      });
+
+      return (
+        <div key={lIdx} style={{ marginBottom: line.trim() ? '4px' : '6px' }}>
+          {renderedParts}
+        </div>
+      );
+    });
+  };
+
   const handleSendMessage = () => {
     if (!chatInput.trim()) return;
     const text = chatInput.trim();
@@ -1357,12 +1381,14 @@ export default function Room({ roomId, initialName, onNavigate }) {
               </button>
             </div>
 
-            {/* Small Window 3: Live In-Room Chat & AI Co-Pilot */}
-            <div className="huddle-video-card huddle-chat-inline-card">
+            {/* Live In-Room Chat & AI Co-Pilot */}
+            <div className="huddle-chat-inline-card">
               {/* Chat Header */}
               <div className="chat-inline-header">
                 <div className="chat-header-left">
-                  <i className="fa-regular fa-message" style={{ color: 'var(--mint)', fontSize: '0.85rem' }}></i>
+                  <div className="chat-header-badge-icon">
+                    <i className="fa-solid fa-comments"></i>
+                  </div>
                   <span className="chat-title-text">ROOM CHAT</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1412,8 +1438,14 @@ export default function Room({ roomId, initialName, onNavigate }) {
               {/* Messages Stream */}
               <div className="chat-inline-messages">
                 {messages.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.78rem', marginTop: '30px' }}>
-                    Say hi or type <strong style={{ color: 'var(--mint)' }}>@ai</strong> to ask the AI assistant!
+                  <div className="chat-empty-state">
+                    <div className="chat-empty-icon">
+                      <i className="fa-regular fa-comments"></i>
+                    </div>
+                    <p className="chat-empty-title">Start the conversation</p>
+                    <p className="chat-empty-sub">
+                      Say hello or type <span className="ai-highlight-pill">@ai</span> to ask the co-pilot!
+                    </p>
                   </div>
                 ) : (
                   messages.map((m, idx) => {
@@ -1431,16 +1463,18 @@ export default function Room({ roomId, initialName, onNavigate }) {
                           <div className="ai-msg-badge">
                             <i className="fa-solid fa-wand-magic-sparkles"></i> Watchooo AI Co-Pilot
                           </div>
-                          <div className="msg-bubble ai-bubble">{m.text}</div>
+                          <div className="msg-bubble ai-bubble">{formatAiMessage(m.text)}</div>
                         </div>
                       );
                     }
                     return (
                       <div key={idx} className={`message-item ${isSelf ? 'sent' : 'received'}`}>
                         <div className="msg-meta">
-                          <span>{isSelf ? 'You' : m.sender}</span>
-                          <span>•</span>
-                          <span>{m.time}</span>
+                          <span className="msg-sender-name">
+                            {!isSelf && <i className="fa-solid fa-circle-user" style={{ marginRight: '3px' }}></i>}
+                            {isSelf ? 'You' : m.sender}
+                          </span>
+                          <span className="msg-time">{m.time}</span>
                         </div>
                         <div className="msg-bubble">{m.text}</div>
                       </div>
@@ -1451,7 +1485,11 @@ export default function Room({ roomId, initialName, onNavigate }) {
               </div>
 
               {/* Typing indicator */}
-              {typingText && <div className="typing-indicator">{typingText}</div>}
+              {typingText && (
+                <div className="typing-indicator">
+                  <i className="fa-solid fa-pen-nib"></i> {typingText}
+                </div>
+              )}
 
               {/* Emoji reactions bar */}
               <div className="chat-inline-emoji-bar">
@@ -1475,13 +1513,13 @@ export default function Room({ roomId, initialName, onNavigate }) {
                 <input
                   type="text"
                   className="clean-input-box chat-inline-input"
-                  placeholder="Send a message or type @ai..."
+                  placeholder="Type a message or @ai to ask assistant..."
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={handleChatKeyDown}
                   autoComplete="off"
                 />
-                <button type="button" onClick={handleSendMessage} className="btn-mint-pill chat-inline-send-btn">
+                <button type="button" onClick={handleSendMessage} className="btn-mint-pill chat-inline-send-btn" title="Send message">
                   <i className="fa-solid fa-paper-plane"></i>
                 </button>
               </div>

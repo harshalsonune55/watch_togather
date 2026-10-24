@@ -174,22 +174,43 @@ Recent Room Chat:
 ${formattedChat}
 User Request: ${prompt || 'What did I miss?'}`;
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const modelName = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
+    let response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: modelName,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent }
         ],
         temperature: 0.6,
-        max_tokens: 250
+        max_tokens: 300
       })
     });
+
+    if (!response.ok) {
+      // Fallback model if primary failed
+      response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userContent }
+          ],
+          temperature: 0.6,
+          max_tokens: 600
+        })
+      });
+    }
 
     if (!response.ok) {
       const errText = await response.text();

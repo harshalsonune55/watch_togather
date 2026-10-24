@@ -1393,8 +1393,19 @@ body {
   gap: 12px;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #27272a transparent;
   transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.huddle-side-column::-webkit-scrollbar {
+  width: 4px;
+}
+.huddle-side-column::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 4px;
 }
 
 /* 2-Cam Video Grid: Side-by-Side Webcams */
@@ -1554,8 +1565,8 @@ body {
    ========================================================================== */
 
 .huddle-chat-inline-card {
-  flex: 1;
-  min-height: 240px;
+  flex: 1 1 0;
+  min-height: 200px;
   background: var(--bg-sidebar);
   border: 1px solid var(--border-card);
   border-radius: 16px;
@@ -1652,17 +1663,24 @@ body {
 }
 
 .chat-inline-messages {
-  flex: 1;
-  min-height: 120px;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 14px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: #27272a transparent;
 }
 
 .chat-inline-messages::-webkit-scrollbar {
   width: 5px;
+}
+.chat-inline-messages::-webkit-scrollbar-track {
+  background: transparent;
 }
 .chat-inline-messages::-webkit-scrollbar-thumb {
   background: #27272a;

@@ -115,6 +115,7 @@ export default function Room({ roomId, initialName, onNavigate }) {
   const lastReportedTimeRef = useRef(0);
   const stageScreenShareRef = useRef(stageScreenShare);
   const messagesEndRef = useRef(null);
+  const chatMessagesRef = useRef(null);
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
@@ -401,7 +402,12 @@ export default function Room({ roomId, initialName, onNavigate }) {
 
   // Scroll chat to bottom on new message
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (chatMessagesRef.current) {
+      chatMessagesRef.current.scrollTo({
+        top: chatMessagesRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    } else if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
@@ -1891,10 +1897,7 @@ export default function Room({ roomId, initialName, onNavigate }) {
                 {/* Illustrated Center Avatar Placeholder */}
                 <div className={`tile-avatar-placeholder ${!remoteCamActive || !remotePeerConnected ? 'show' : ''}`}>
                   <div className="huddle-center-avatar lavender">
-                    <i className="fa-solid fa-user-astronaut"></i>
-                  </div>
-                  <div className="tile-placeholder-text">
-                    {!remotePeerConnected ? 'Waiting...' : 'Camera Off'}
+                    <i className="fa-solid fa-user"></i>
                   </div>
                 </div>
 
@@ -1927,7 +1930,6 @@ export default function Room({ roomId, initialName, onNavigate }) {
                   <div className="huddle-center-avatar mint">
                     <i className="fa-solid fa-user"></i>
                   </div>
-                  <div className="tile-placeholder-text">Camera Off</div>
                 </div>
 
                 {/* Local User Badge */}
@@ -2041,7 +2043,7 @@ export default function Room({ roomId, initialName, onNavigate }) {
               )}
 
               {/* Messages Stream */}
-              <div className="chat-inline-messages">
+              <div ref={chatMessagesRef} className="chat-inline-messages">
                 {messages.length === 0 ? (
                   <div className="chat-empty-state">
                     <div className="chat-empty-icon">

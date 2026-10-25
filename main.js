@@ -166,10 +166,13 @@ app.engine("ejs", engine);
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-// Serve built React frontend from client/dist if present
+// Serve built React frontend from client/dist or build if present
 const clientDistPath = path.join(__dirname, "client", "dist");
-if (fs.existsSync(clientDistPath)) {
-  app.use(express.static(clientDistPath, {
+const rootBuildPath = path.join(__dirname, "build");
+const staticDistPath = fs.existsSync(clientDistPath) ? clientDistPath : (fs.existsSync(rootBuildPath) ? rootBuildPath : null);
+
+if (staticDistPath) {
+  app.use(express.static(staticDistPath, {
     maxAge: "1d",
     setHeaders: (res, filePath) => {
       if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
@@ -285,7 +288,7 @@ app.get("*", (req, res, next) => {
     return next();
   }
 
-  const indexPath = path.join(__dirname, "client", "dist", "index.html");
+  const indexPath = staticDistPath ? path.join(staticDistPath, "index.html") : path.join(__dirname, "client", "dist", "index.html");
   if (fs.existsSync(indexPath)) {
     return res.sendFile(indexPath);
   }
